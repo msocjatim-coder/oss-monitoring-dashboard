@@ -11,14 +11,13 @@ uploaded_file = st.file_uploader("Upload File CSV dari OSS", type=["csv"])
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
 
-df.columns = df.columns.str.strip()
-df.columns = df.columns.str.replace('"', '')
-df.columns = df.columns.str.replace(',', '')
+    # Bersihkan nama kolom
+    df.columns = df.columns.str.strip()
+    df.columns = df.columns.str.replace('"', '', regex=False)
+    df.columns = df.columns.str.replace(',', '', regex=False)
 
-required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE"]
     st.success("File berhasil diupload!")
 
-    # Pastikan kolom penting ada
     required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE"]
 
     missing_cols = [col for col in required_columns if col not in df.columns]
@@ -26,18 +25,16 @@ required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE"]
     if missing_cols:
         st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     else:
-        # Konversi tanggal
         df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
 
-        # Hitung umur tiket
         df["UMUR_TIKET_HARI"] = (datetime.now() - df["REPORTED DATE"]).dt.days
 
-        # Tentukan tiket aktif
         df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(["closed", "resolved", "cancel"])
 
         st.subheader("🔎 Filter Data")
 
-        witel_filter = st.selectbox("Filter Witel", ["Semua"] + sorted(df["WITEL"].dropna().unique().tolist()))
+        witel_list = sorted(df["WITEL"].dropna().unique().tolist())
+        witel_filter = st.selectbox("Filter Witel", ["Semua"] + witel_list)
 
         if witel_filter != "Semua":
             df = df[df["WITEL"] == witel_filter]
@@ -55,7 +52,6 @@ required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE"]
         st.subheader("📋 Data Tiket")
         st.dataframe(df, use_container_width=True)
 
-        # Download hasil filter
         csv_download = df.to_csv(index=False).encode("utf-8")
         st.download_button(
             label="⬇ Download Data (CSV)",
