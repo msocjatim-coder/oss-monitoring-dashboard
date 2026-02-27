@@ -32,16 +32,15 @@ if uploaded_files:
     st.success(f"{len(uploaded_files)} file berhasil digabung!")
 
     required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
-
     missing_cols = [col for col in required_columns if col not in df.columns]
 
     if missing_cols:
         st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     else:
+        # ================= DATA DASAR =================
         df = df.drop_duplicates(subset=["INCIDENT"])
 
         df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
-
         df["UMUR_TIKET_HARI"] = (datetime.now() - df["REPORTED DATE"]).dt.days
 
         df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
@@ -49,6 +48,8 @@ if uploaded_files:
         )
 
         df["SUMMARY"] = df["SUMMARY"].astype(str)
+
+        # ================= AUTO DETEKSI =================
 
         df["LAYANAN"] = df["SUMMARY"].apply(
             lambda x: "TSEL" if "TSEL" in x.upper() else "OLO"
@@ -81,6 +82,27 @@ if uploaded_files:
             return "-"
 
         df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
+
+        # ================= FORMAT TTR CUSTOMER =================
+
+        if "TTR CUSTOMER" in df.columns:
+            def format_ttr(val):
+                try:
+                    parts = str(val).split(":")
+                    hours = int(parts[0])
+                    minutes = int(parts[1])
+                    return f"{hours} jam {minutes} menit"
+                except:
+                    return val
+
+            df["TTR CUSTOMER"] = df["TTR CUSTOMER"].apply(format_ttr)
+
+        # ================= FORMAT LAST UPDATE WORKLOG =================
+
+        if "LAST UPDATE WORKLOG" in df.columns:
+            df["LAST UPDATE WORKLOG"] = pd.to_datetime(
+                df["LAST UPDATE WORKLOG"], errors="coerce"
+            ).dt.strftime("%H:%M:%S")
 
         # ================= FILTER =================
 
@@ -148,19 +170,21 @@ if uploaded_files:
             [
                 "INCIDENT",
                 "WITEL",
+                "LAYANAN",
                 "SERVICE ID",
+                "JENIS_GANGGUAN",
+                "SEVERITY",
                 "TTR CUSTOMER",
                 "LAST UPDATE WORKLOG",
                 "WORKLOG SUMMARY",
             ]
         ].copy()
 
-        # Simpan severity ke display agar styling aman
-        df_display["SEVERITY_TEMP"] = df["SEVERITY"].values
-
         df_display.index = range(1, len(df_display) + 1)
 
-        def highlight_severity(row):
+        # ================= PEWARNAAN HANYA KOLOM SEVERITY =================
+
+        def highlight_severity(val):
             color_map = {
                 "PREMIUM": "background-color: #800000; color: white;",
                 "CRITICAL": "background-color: red; color: white;",
@@ -168,19 +192,16 @@ if uploaded_files:
                 "MINOR": "background-color: yellow;",
                 "LOW": "background-color: lightgreen;",
             }
-            severity = row["SEVERITY_TEMP"]
-            return [color_map.get(severity, "")] * len(row)
+            return color_map.get(val, "")
 
-        styled_df = (
-            df_display
-            .style
-            .apply(highlight_severity, axis=1)
-            .hide(axis="columns", subset=["SEVERITY_TEMP"])
+        styled_df = df_display.style.applymap(
+            highlight_severity,
+            subset=["SEVERITY"]
         )
 
         st.dataframe(styled_df, use_container_width=True)
 
-        csv_download = df_display.drop(columns=["SEVERITY_TEMP"]).to_csv(index=False).encode("utf-8")
+        csv_download = df_display.to_csv(index=False).encode("utf-8")
 
         st.download_button(
             label="⬇ Download Data Monitoring (CSV)",
