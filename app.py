@@ -31,13 +31,13 @@ if uploaded_files:
 
     st.success(f"{len(uploaded_files)} file berhasil digabung!")
 
-    required_columns = ["INCIDENT", "STATUS", "DISTRICT", "REPORTED DATE", "SUMMARY"]
-
+    required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
     missing_cols = [col for col in required_columns if col not in df.columns]
 
     if missing_cols:
         st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     else:
+        # ================= DATA DASAR =================
         df = df.drop_duplicates(subset=["INCIDENT"])
 
         df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
@@ -83,7 +83,7 @@ if uploaded_files:
 
         df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
-        # ================= FORMAT TTR =================
+        # ================= FORMAT TTR CUSTOMER =================
 
         if "TTR CUSTOMER" in df.columns:
             def format_ttr(val):
@@ -97,7 +97,7 @@ if uploaded_files:
 
             df["TTR CUSTOMER"] = df["TTR CUSTOMER"].apply(format_ttr)
 
-        # ================= FORMAT LAST UPDATE =================
+        # ================= FORMAT LAST UPDATE WORKLOG =================
 
         if "LAST UPDATE WORKLOG" in df.columns:
             df["LAST UPDATE WORKLOG"] = pd.to_datetime(
@@ -111,8 +111,8 @@ if uploaded_files:
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            district_list = sorted(df["DISTRICT"].dropna().unique().tolist())
-            district_filter = st.selectbox("Filter District", ["Semua"] + district_list)
+            witel_list = sorted(df["WITEL"].dropna().unique().tolist())
+            witel_filter = st.selectbox("Filter Witel", ["Semua"] + witel_list)
 
         with col2:
             layanan_filter = st.selectbox(
@@ -132,8 +132,8 @@ if uploaded_files:
                 ["Semua"] + sorted(df["SEVERITY"].unique())
             )
 
-        if district_filter != "Semua":
-            df = df[df["DISTRICT"] == district_filter]
+        if witel_filter != "Semua":
+            df = df[df["WITEL"] == witel_filter]
 
         if layanan_filter != "Semua":
             df = df[df["LAYANAN"] == layanan_filter]
@@ -149,25 +149,18 @@ if uploaded_files:
         if show_active_only:
             df = df[df["IS_ACTIVE"] == True]
 
-        # ================= RINGKASAN BARU =================
+        # ================= RINGKASAN =================
 
-        st.subheader("📊 Ringkasan")
+        st.subheader("📈 Ringkasan")
 
-        total_tiket = len(df)
+        colA, colB, colC = st.columns(3)
 
-        df_tsel = df[df["LAYANAN"] == "TSEL"]
-
-        summary_data = {
-            "Total Tiket": total_tiket,
-            "LOW": len(df_tsel[df_tsel["SEVERITY"] == "LOW"]),
-            "MINOR": len(df_tsel[df_tsel["SEVERITY"] == "MINOR"]),
-            "MAJOR": len(df_tsel[df_tsel["SEVERITY"] == "MAJOR"]),
-            "CRITICAL": len(df_tsel[df_tsel["SEVERITY"] == "CRITICAL"]),
-            "PREMIUM": len(df_tsel[df_tsel["SEVERITY"] == "PREMIUM"]),
-        }
-
-        summary_df = pd.DataFrame([summary_data])
-        st.dataframe(summary_df, use_container_width=True)
+        colA.metric("Total Tiket", len(df))
+        colB.metric("Tiket Aktif", int(df["IS_ACTIVE"].sum()))
+        colC.metric(
+            "Critical / Major",
+            int(df[df["SEVERITY"].isin(["CRITICAL", "MAJOR"])].shape[0])
+        )
 
         # ================= DATA MONITORING =================
 
@@ -176,7 +169,7 @@ if uploaded_files:
         df_display = df[
             [
                 "INCIDENT",
-                "DISTRICT",
+                "WITEL",
                 "LAYANAN",
                 "SERVICE ID",
                 "JENIS_GANGGUAN",
@@ -188,6 +181,8 @@ if uploaded_files:
         ].copy()
 
         df_display.index = range(1, len(df_display) + 1)
+
+        # ================= PEWARNAAN HANYA KOLOM SEVERITY =================
 
         def highlight_severity(val):
             color_map = {
