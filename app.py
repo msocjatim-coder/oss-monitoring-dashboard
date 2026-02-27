@@ -40,7 +40,7 @@ if uploaded_files:
     if missing_cols:
         st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     else:
-        # Hapus duplikat
+        # Hapus duplikat berdasarkan INCIDENT
         df = df.drop_duplicates(subset=["INCIDENT"])
 
         # Konversi tanggal
@@ -54,9 +54,9 @@ if uploaded_files:
             ["closed", "resolved", "cancel"]
         )
 
-        # ==========================================
+        # ===============================
         # AUTO DETEKSI DARI SUMMARY
-        # ==========================================
+        # ===============================
 
         df["SUMMARY"] = df["SUMMARY"].astype(str)
 
@@ -95,9 +95,9 @@ if uploaded_files:
 
         df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
-        # ==========================================
+        # ===============================
         # FILTER
-        # ==========================================
+        # ===============================
 
         st.subheader("🔎 Filter Data")
 
@@ -142,9 +142,9 @@ if uploaded_files:
         if show_active_only:
             df = df[df["IS_ACTIVE"] == True]
 
-        # ==========================================
+        # ===============================
         # RINGKASAN
-        # ==========================================
+        # ===============================
 
         st.subheader("📈 Ringkasan")
 
@@ -157,27 +157,26 @@ if uploaded_files:
             int(df[df["SEVERITY"].isin(["CRITICAL", "MAJOR"])].shape[0])
         )
 
-        # ==========================================
-        # DATA MONITORING (FIELD TERBATAS)
-        # ==========================================
+        # ===============================
+        # DATA MONITORING (HANYA 6 KOLOM)
+        # ===============================
 
         st.subheader("📋 Data Monitoring")
 
-        monitoring_fields = [
-            "INCIDENT",
-            "WITEL",
-            "SERVICE ID",
-            "TTR CUSTOMER",
-            "LAST UPDATE WORKLOG",
-            "WORKLOG SUMMARY"
-        ]
+        df_display = df[
+            [
+                "INCIDENT",
+                "WITEL",
+                "SERVICE ID",
+                "TTR CUSTOMER",
+                "LAST UPDATE WORKLOG",
+                "WORKLOG SUMMARY",
+            ]
+        ].copy()
 
-        available_fields = [col for col in monitoring_fields if col in df.columns]
-
-        df_display = df[available_fields].copy()
         df_display.index = range(1, len(df_display) + 1)
 
-        # Pewarnaan berdasarkan severity (tetap aktif)
+        # Pewarnaan berdasarkan severity
         def highlight_severity(row):
             color_map = {
                 "PREMIUM": "background-color: #800000; color: white;",
