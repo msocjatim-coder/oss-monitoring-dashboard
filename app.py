@@ -11,9 +11,11 @@ uploaded_file = st.file_uploader("Upload File CSV dari OSS", type=["csv"])
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
 
-    # Normalisasi nama kolom (hapus spasi berlebih)
-    df.columns = df.columns.str.strip()
+df.columns = df.columns.str.strip()
+df.columns = df.columns.str.replace('"', '')
+df.columns = df.columns.str.replace(',', '')
 
+required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE"]
     st.success("File berhasil diupload!")
 
     # Pastikan kolom penting ada
