@@ -17,16 +17,16 @@ if uploaded_files:
 
     for uploaded_file in uploaded_files:
         try:
-            df_temp = pd.read_csv(uploaded_file)
+            df = pd.read_csv(uploaded_file)
         except:
-            df_temp = pd.read_csv(uploaded_file, encoding="latin1")
+            df = pd.read_csv(uploaded_file, encoding="latin1")
 
         # Bersihkan nama kolom
-        df_temp.columns = df_temp.columns.str.strip()
-        df_temp.columns = df_temp.columns.str.replace('"', '', regex=False)
-        df_temp.columns = df_temp.columns.str.replace(',', '', regex=False)
+        df.columns = df.columns.str.strip()
+        df.columns = df.columns.str.replace('"', '', regex=False)
+        df.columns = df.columns.str.replace(',', '', regex=False)
 
-        df_list.append(df_temp)
+        df_list.append(df)
 
     # Gabungkan semua file
     df = pd.concat(df_list, ignore_index=True)
@@ -72,22 +72,10 @@ if uploaded_files:
         col1.metric("Total Tiket", len(df))
         col2.metric("Tiket Aktif", int(df["IS_ACTIVE"].sum()))
 
-        st.subheader("📋 Data Monitoring")
-
-        # Field monitoring saja
-        monitoring_fields = [
-            "INCIDENT",
-            "SERVICE ID",
-            "TTR CUSTOMER",
-            "LAST UPDATE WORKLOG",
-            "WORKLOG SUMMARY"
-        ]
-
-        available_fields = [col for col in monitoring_fields if col in df.columns]
-
-        df_display = df[available_fields].copy()
+        st.subheader("📋 Data Tiket")
 
         # Index mulai dari 1
+        df_display = df.copy()
         df_display.index = range(1, len(df_display) + 1)
 
         st.dataframe(df_display, use_container_width=True)
@@ -95,7 +83,7 @@ if uploaded_files:
         # Tombol download
         csv_download = df_display.to_csv(index=False).encode("utf-8")
         st.download_button(
-            label="⬇ Download Data Monitoring (CSV)",
+            label="⬇ Download Data (CSV)",
             data=csv_download,
             file_name="hasil_monitoring.csv",
             mime="text/csv"
