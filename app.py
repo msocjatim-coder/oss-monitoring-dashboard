@@ -6,18 +6,34 @@ st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
 st.title("📊 OSS Monitoring Dashboard")
 
-uploaded_file = st.file_uploader("Upload File CSV dari OSS", type=["csv"])
+uploaded_files = st.file_uploader(
+    "Upload Semua File CSV dari OSS (Bisa banyak sekaligus)",
+    type=["csv"],
+    accept_multiple_files=True
+)
 
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
+if uploaded_files:
+    df_list = []
 
-    # Bersihkan nama kolom
-    df.columns = df.columns.str.strip()
-    df.columns = df.columns.str.replace('"', '', regex=False)
-    df.columns = df.columns.str.replace(',', '', regex=False)
+    for uploaded_file in uploaded_files:
+        try:
+            df = pd.read_csv(uploaded_file)
+        except:
+            df = pd.read_csv(uploaded_file, encoding="latin1")
 
-    st.success("File berhasil diupload!")
+        # Bersihkan nama kolom
+        df.columns = df.columns.str.strip()
+        df.columns = df.columns.str.replace('"', '', regex=False)
+        df.columns = df.columns.str.replace(',', '', regex=False)
 
+        df_list.append(df)
+
+    # Gabungkan semua file
+    df = pd.concat(df_list, ignore_index=True)
+
+    st.success(f"{len(uploaded_files)} file berhasil digabung!")
+
+    # Kolom wajib berdasarkan CSV OSS kamu
     required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE"]
 
     missing_cols = [col for col in required_columns if col not in df.columns]
@@ -25,11 +41,19 @@ if uploaded_file is not None:
     if missing_cols:
         st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     else:
+        # Hapus duplikat berdasarkan INCIDENT
+        df = df.drop_duplicates(subset=["INCIDENT"])
+
+        # Konversi tanggal
         df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
 
+        # Hitung umur tiket
         df["UMUR_TIKET_HARI"] = (datetime.now() - df["REPORTED DATE"]).dt.days
 
-        df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(["closed", "resolved", "cancel"])
+        # Tentukan tiket aktif
+        df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
+            ["closed", "resolved", "cancel"]
+        )
 
         st.subheader("🔎 Filter Data")
 
@@ -47,11 +71,12 @@ if uploaded_file is not None:
         st.subheader("📈 Ringkasan")
         col1, col2 = st.columns(2)
         col1.metric("Total Tiket", len(df))
-        col2.metric("Tiket Aktif", df["IS_ACTIVE"].sum())
+        col2.metric("Tiket Aktif", int(df["IS_ACTIVE"].sum()))
 
         st.subheader("📋 Data Tiket")
         st.dataframe(df, use_container_width=True)
 
+        # Tombol download
         csv_download = df.to_csv(index=False).encode("utf-8")
         st.download_button(
             label="⬇ Download Data (CSV)",
