@@ -17,7 +17,7 @@ if uploaded_file is not None:
     st.success("File berhasil diupload!")
 
     # Pastikan kolom penting ada
-    required_columns = ["TICKET ID", "STATUS", "WITEL", "REPORTED DATE"]
+    required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE"]
 
     missing_cols = [col for col in required_columns if col not in df.columns]
 
