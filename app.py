@@ -74,9 +74,9 @@ if uploaded_files:
 
         st.subheader("📋 Data Tiket")
 
-        # Tambahkan nomor urut mulai dari 1
+        # ✅ UPDATE FINAL: index mulai dari 1 (tanpa kolom tambahan)
         df_display = df.copy()
-        df_display.insert(0, "NO", range(1, len(df_display) + 1))
+        df_display.index = range(1, len(df_display) + 1)
 
         st.dataframe(df_display, use_container_width=True)
 
