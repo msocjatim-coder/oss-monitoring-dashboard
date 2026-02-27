@@ -33,7 +33,6 @@ if uploaded_files:
 
     st.success(f"{len(uploaded_files)} file berhasil digabung!")
 
-    # Kolom wajib berdasarkan CSV OSS kamu
     required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE"]
 
     missing_cols = [col for col in required_columns if col not in df.columns]
@@ -74,10 +73,15 @@ if uploaded_files:
         col2.metric("Tiket Aktif", int(df["IS_ACTIVE"].sum()))
 
         st.subheader("📋 Data Tiket")
-        st.dataframe(df, use_container_width=True)
+
+        # Tambahkan nomor urut mulai dari 1
+        df_display = df.copy()
+        df_display.insert(0, "NO", range(1, len(df_display) + 1))
+
+        st.dataframe(df_display, use_container_width=True)
 
         # Tombol download
-        csv_download = df.to_csv(index=False).encode("utf-8")
+        csv_download = df_display.to_csv(index=False).encode("utf-8")
         st.download_button(
             label="⬇ Download Data (CSV)",
             data=csv_download,
