@@ -21,14 +21,12 @@ if uploaded_files:
         except:
             df_temp = pd.read_csv(uploaded_file, encoding="latin1")
 
-        # Bersihkan nama kolom
         df_temp.columns = df_temp.columns.str.strip()
         df_temp.columns = df_temp.columns.str.replace('"', '', regex=False)
         df_temp.columns = df_temp.columns.str.replace(',', '', regex=False)
 
         df_list.append(df_temp)
 
-    # Gabungkan semua file
     df = pd.concat(df_list, ignore_index=True)
 
     st.success(f"{len(uploaded_files)} file berhasil digabung!")
@@ -40,32 +38,22 @@ if uploaded_files:
     if missing_cols:
         st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     else:
-        # Hapus duplikat berdasarkan INCIDENT
         df = df.drop_duplicates(subset=["INCIDENT"])
 
-        # Konversi tanggal
         df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
 
-        # Hitung umur tiket
         df["UMUR_TIKET_HARI"] = (datetime.now() - df["REPORTED DATE"]).dt.days
 
-        # Tentukan tiket aktif
         df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
             ["closed", "resolved", "cancel"]
         )
 
-        # ===============================
-        # AUTO DETEKSI DARI SUMMARY
-        # ===============================
-
         df["SUMMARY"] = df["SUMMARY"].astype(str)
 
-        # LAYANAN
         df["LAYANAN"] = df["SUMMARY"].apply(
             lambda x: "TSEL" if "TSEL" in x.upper() else "OLO"
         )
 
-        # JENIS
         def detect_jenis(summary):
             summary = summary.upper()
             if "RADIOIP" in summary:
@@ -83,7 +71,6 @@ if uploaded_files:
 
         df["JENIS_GANGGUAN"] = df["SUMMARY"].apply(detect_jenis)
 
-        # SEVERITY
         severity_list = ["PREMIUM", "CRITICAL", "MAJOR", "MINOR", "LOW"]
 
         def detect_severity(summary):
@@ -95,9 +82,7 @@ if uploaded_files:
 
         df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
-        # ===============================
-        # FILTER
-        # ===============================
+        # ================= FILTER =================
 
         st.subheader("🔎 Filter Data")
 
@@ -142,9 +127,7 @@ if uploaded_files:
         if show_active_only:
             df = df[df["IS_ACTIVE"] == True]
 
-        # ===============================
-        # RINGKASAN
-        # ===============================
+        # ================= RINGKASAN =================
 
         st.subheader("📈 Ringkasan")
 
@@ -157,9 +140,7 @@ if uploaded_files:
             int(df[df["SEVERITY"].isin(["CRITICAL", "MAJOR"])].shape[0])
         )
 
-        # ===============================
-        # DATA MONITORING (HANYA 6 KOLOM)
-        # ===============================
+        # ================= DATA MONITORING =================
 
         st.subheader("📋 Data Monitoring")
 
@@ -174,9 +155,11 @@ if uploaded_files:
             ]
         ].copy()
 
+        # Simpan severity ke display agar styling aman
+        df_display["SEVERITY_TEMP"] = df["SEVERITY"].values
+
         df_display.index = range(1, len(df_display) + 1)
 
-        # Pewarnaan berdasarkan severity
         def highlight_severity(row):
             color_map = {
                 "PREMIUM": "background-color: #800000; color: white;",
@@ -185,16 +168,20 @@ if uploaded_files:
                 "MINOR": "background-color: yellow;",
                 "LOW": "background-color: lightgreen;",
             }
-            severity = df.loc[row.name, "SEVERITY"]
+            severity = row["SEVERITY_TEMP"]
             return [color_map.get(severity, "")] * len(row)
 
-        st.dataframe(
-            df_display.style.apply(highlight_severity, axis=1),
-            use_container_width=True
+        styled_df = (
+            df_display
+            .style
+            .apply(highlight_severity, axis=1)
+            .hide(axis="columns", subset=["SEVERITY_TEMP"])
         )
 
-        # Download sesuai tampilan
-        csv_download = df_display.to_csv(index=False).encode("utf-8")
+        st.dataframe(styled_df, use_container_width=True)
+
+        csv_download = df_display.drop(columns=["SEVERITY_TEMP"]).to_csv(index=False).encode("utf-8")
+
         st.download_button(
             label="⬇ Download Data Monitoring (CSV)",
             data=csv_download,
