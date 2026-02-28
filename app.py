@@ -6,12 +6,8 @@ st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
 st.title("📊 OSS Monitoring Dashboard")
 
-# ================= MENU BAR =================
-menu = st.radio(
-    "",
-    ["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"],
-    horizontal=True
-)
+# ================= MENU TAB (KOTAK) =================
+tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
 
 uploaded_files = st.file_uploader(
     "Upload Semua File CSV dari OSS (Bisa banyak sekaligus)",
@@ -57,8 +53,6 @@ if uploaded_files:
 
         df["SUMMARY"] = df["SUMMARY"].astype(str)
 
-        # ================= AUTO DETEKSI =================
-
         df["LAYANAN"] = df["SUMMARY"].apply(
             lambda x: "TSEL" if "TSEL" in x.upper() else "OLO"
         )
@@ -91,8 +85,7 @@ if uploaded_files:
 
         df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
-        # ================= FORMAT TTR =================
-
+        # FORMAT TTR
         if "TTR CUSTOMER" in df.columns:
             def format_ttr(val):
                 try:
@@ -105,21 +98,39 @@ if uploaded_files:
 
             df["TTR CUSTOMER"] = df["TTR CUSTOMER"].apply(format_ttr)
 
-        # ================= FORMAT LAST UPDATE =================
-
+        # FORMAT LAST UPDATE
         if "LAST UPDATE WORKLOG" in df.columns:
             df["LAST UPDATE WORKLOG"] = pd.to_datetime(
                 df["LAST UPDATE WORKLOG"], errors="coerce"
             ).dt.strftime("%H:%M:%S")
 
         # ============================================================
-        # ======================= TIKET AKTIF =========================
+        # ======================= TAB 1 : TIKET AKTIF =================
         # ============================================================
 
-        if menu == "TIKET AKTIF":
+        with tab1:
 
             df_active = df[df["IS_ACTIVE"] == True].copy()
 
+            # ===== RINGKASAN (DIKEMBALIKAN) =====
+            st.subheader("📊 Ringkasan")
+
+            total_tiket = len(df_active)
+            df_tsel = df_active[df_active["LAYANAN"] == "TSEL"]
+
+            summary_data = {
+                "Total Tiket": total_tiket,
+                "LOW": len(df_tsel[df_tsel["SEVERITY"] == "LOW"]),
+                "MINOR": len(df_tsel[df_tsel["SEVERITY"] == "MINOR"]),
+                "MAJOR": len(df_tsel[df_tsel["SEVERITY"] == "MAJOR"]),
+                "CRITICAL": len(df_tsel[df_tsel["SEVERITY"] == "CRITICAL"]),
+                "PREMIUM": len(df_tsel[df_tsel["SEVERITY"] == "PREMIUM"]),
+            }
+
+            summary_df = pd.DataFrame([summary_data])
+            st.dataframe(summary_df, use_container_width=True)
+
+            # ===== DATA MONITORING =====
             st.subheader("📋 Data Monitoring Tiket Aktif")
 
             df_display = df_active[
@@ -156,10 +167,10 @@ if uploaded_files:
             st.dataframe(styled_df, use_container_width=True)
 
         # ============================================================
-        # ======================= TIKET CLOSE =========================
+        # ======================= TAB 2 : TIKET CLOSE =================
         # ============================================================
 
-        elif menu == "TIKET CLOSE":
+        with tab2:
 
             df_close = df[df["IS_ACTIVE"] == False].copy()
 
@@ -189,17 +200,17 @@ if uploaded_files:
             st.dataframe(df_close_display, use_container_width=True)
 
         # ============================================================
-        # ======================= DOWNLOAD TIKET ======================
+        # ======================= TAB 3 : DOWNLOAD ====================
         # ============================================================
 
-        elif menu == "DOWNLOAD TIKET":
+        with tab3:
 
-            st.subheader("⬇ Download Semua Data Tiket")
+            st.subheader("⬇ Download Semua Data OSS")
 
             csv_download = df.to_csv(index=False).encode("utf-8")
 
             st.download_button(
-                label="Download Semua Data OSS (CSV)",
+                label="Download Semua Data (CSV)",
                 data=csv_download,
                 file_name="oss_all_ticket.csv",
                 mime="text/csv"
