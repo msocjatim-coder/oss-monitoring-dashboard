@@ -9,37 +9,28 @@ DATA_FILE = "data_latest.csv"
 TIME_FILE = "last_update.txt"
 
 # ============================================================
-# ======================= CUSTOM CSS (SAFE UI ONLY) ==========
+# ======================= CUSTOM CSS =========================
 # ============================================================
 
 st.markdown("""
 <style>
-
-/* Perkecil lebar area uploader supaya lebih efisien */
 [data-testid="stFileUploader"] {
     max-width: 260px !important;
 }
-
-/* Buat kotak lebih pendek (persegi panjang) */
 [data-testid="stFileUploader"] section {
     padding: 8px 12px 8px 12px !important;
 }
-
-/* Atur tinggi agar tidak terlalu besar */
 [data-testid="stFileUploader"] div[role="button"] {
     min-height: 60px !important;
 }
-
-/* Rapikan teks agar tidak kepotong */
 [data-testid="stFileUploader"] small {
     font-size: 12px !important;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# ======================= HEADER ==============================
+# ======================= HEADER =============================
 # ============================================================
 
 header_col1, header_col2 = st.columns([9, 1])
@@ -99,7 +90,19 @@ df = pd.read_csv(DATA_FILE)
 # ======================= VALIDASI KOLOM =====================
 # ============================================================
 
-required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
+required_columns = [
+    "INCIDENT",
+    "WITEL",
+    "SERVICE ID",
+    "SUMMARY",
+    "STATUS",
+    "REPORTED DATE",
+    "CUSTOMER",
+    "LAST UPDATE",
+    "WORKLOG",
+    "WORKLOGS SUMMARY"
+]
+
 missing_cols = [col for col in required_columns if col not in df.columns]
 
 if missing_cols:
@@ -113,7 +116,11 @@ if missing_cols:
 df = df.drop_duplicates(subset=["INCIDENT"])
 
 df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
-df["UMUR_TIKET_HARI"] = (datetime.now() - df["REPORTED DATE"]).dt.days
+df["LAST UPDATE"] = pd.to_datetime(df["LAST UPDATE"], errors="coerce")
+
+# TTR dalam jam
+df["TTR"] = (df["LAST UPDATE"] - df["REPORTED DATE"]).dt.total_seconds() / 3600
+df["TTR"] = df["TTR"].round(2)
 
 df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
     ["closed", "resolved", "cancel"]
@@ -140,7 +147,7 @@ def detect_jenis(summary):
     else:
         return "-"
 
-df["JENIS_GANGGUAN"] = df["SUMMARY"].apply(detect_jenis)
+df["JENIS"] = df["SUMMARY"].apply(detect_jenis)
 
 severity_list = ["PREMIUM", "CRITICAL", "MAJOR", "MINOR", "LOW"]
 
@@ -163,32 +170,22 @@ with tab1:
 
     df_active = df[df["IS_ACTIVE"] == True].copy()
 
-    st.subheader("📊 Ringkasan")
-
-    total_tiket = len(df_active)
-    df_tsel = df_active[df_active["LAYANAN"] == "TSEL"]
-
-    summary_data = {
-        "Total Tiket": total_tiket,
-        "LOW": len(df_tsel[df_tsel["SEVERITY"] == "LOW"]),
-        "MINOR": len(df_tsel[df_tsel["SEVERITY"] == "MINOR"]),
-        "MAJOR": len(df_tsel[df_tsel["SEVERITY"] == "MAJOR"]),
-        "CRITICAL": len(df_tsel[df_tsel["SEVERITY"] == "CRITICAL"]),
-        "PREMIUM": len(df_tsel[df_tsel["SEVERITY"] == "PREMIUM"]),
-    }
-
-    st.dataframe(pd.DataFrame([summary_data]), use_container_width=True)
-
-    st.subheader("📋 Data Monitoring Tiket Aktif")
+    st.subheader("📋 Monitoring Dashboard")
 
     df_display = df_active[
         [
             "INCIDENT",
             "WITEL",
             "LAYANAN",
-            "JENIS_GANGGUAN",
+            "SERVICE ID",
+            "JENIS",
             "SEVERITY",
-            "UMUR_TIKET_HARI"
+            "TTR",
+            "CUSTOMER",
+            "LAST UPDATE",
+            "WORKLOG",
+            "WORKLOGS SUMMARY",
+            "SUMMARY"
         ]
     ].copy()
 
@@ -206,8 +203,16 @@ with tab2:
         [
             "INCIDENT",
             "WITEL",
-            "SUMMARY",
-            "REPORTED DATE",
+            "LAYANAN",
+            "SERVICE ID",
+            "JENIS",
+            "SEVERITY",
+            "TTR",
+            "CUSTOMER",
+            "LAST UPDATE",
+            "WORKLOG",
+            "WORKLOGS SUMMARY",
+            "SUMMARY"
         ]
     ].copy()
 
