@@ -9,7 +9,7 @@ DATA_FILE = "data_latest.csv"
 TIME_FILE = "last_update.txt"
 
 # ============================================================
-# ======================= CUSTOM CSS =========================
+# ======================= CUSTOM CSS (ONLY UI FIX) ===========
 # ============================================================
 
 st.markdown("""
@@ -18,7 +18,7 @@ st.markdown("""
 /* ==== UBAH FILE UPLOADER JADI PERSEGI PANJANG ==== */
 
 [data-testid="stFileUploader"] {
-    width: 170px !important;
+    width: 180px !important;
 }
 
 [data-testid="stFileUploader"] section {
@@ -27,7 +27,7 @@ st.markdown("""
     background: transparent !important;
 }
 
-/* HILANGKAN TEKS DRAG & DROP */
+/* HILANGKAN TEKS DRAG & DROP YANG KEPOONG */
 [data-testid="stFileUploader"] small {
     display: none !important;
 }
@@ -38,7 +38,7 @@ st.markdown("""
 
 /* STYLE TOMBOL */
 [data-testid="stFileUploader"] button {
-    width: 170px !important;
+    width: 180px !important;
     height: 42px !important;
     border-radius: 6px !important;
     font-weight: 600 !important;
@@ -86,54 +86,13 @@ if uploaded_files:
 
     df_uploaded = pd.concat(df_list, ignore_index=True)
 
+    # Simpan data terbaru
     df_uploaded.to_csv(DATA_FILE, index=False)
 
+    # Simpan waktu upload terakhir
     now_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     with open(TIME_FILE, "w") as f:
         f.write(now_time)
-
-# ============================================================
-# ======================= STATUS BAR =========================
-# ============================================================
-
-current_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-
-status_col1, status_col2 = st.columns([6, 4])
-
-with status_col1:
-    st.markdown(
-        f"""
-        <div style='font-size:14px;'>
-        🕒 Waktu Sekarang: <b>{current_time} WIB</b>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-if os.path.exists(DATA_FILE) and os.path.exists(TIME_FILE):
-
-    with open(TIME_FILE, "r") as f:
-        last_update_time = f.read()
-
-    with status_col2:
-        st.markdown(
-            f"""
-            <div style='text-align:right; font-size:14px;'>
-            ✅ Data terakhir diperbarui: <b>{last_update_time} WIB</b>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-else:
-    with status_col2:
-        st.markdown(
-            """
-            <div style='text-align:right; font-size:14px; color:red;'>
-            ⚠ Belum ada data diupload
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
 
 st.markdown("---")
 
@@ -211,6 +170,10 @@ df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
 tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
 
+# ============================================================
+# ======================= TAB 1 ===============================
+# ============================================================
+
 with tab1:
 
     df_active = df[df["IS_ACTIVE"] == True].copy()
@@ -248,6 +211,10 @@ with tab1:
 
     st.dataframe(df_display, use_container_width=True)
 
+# ============================================================
+# ======================= TAB 2 ===============================
+# ============================================================
+
 with tab2:
 
     df_close = df[df["IS_ACTIVE"] == False].copy()
@@ -266,6 +233,10 @@ with tab2:
     df_close_display.index = range(1, len(df_close_display) + 1)
 
     st.dataframe(df_close_display, use_container_width=True)
+
+# ============================================================
+# ======================= TAB 3 ===============================
+# ============================================================
 
 with tab3:
 
