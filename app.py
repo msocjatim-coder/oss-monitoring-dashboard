@@ -9,7 +9,50 @@ DATA_FILE = "data_latest.csv"
 TIME_FILE = "last_update.txt"
 
 # ============================================================
-# ======================= HEADER ==============================
+# ======================= CUSTOM CSS =========================
+# ============================================================
+
+st.markdown("""
+<style>
+
+/* Uploader jadi tombol persegi panjang */
+[data-testid="stFileUploader"] {
+    width: 160px !important;
+}
+
+[data-testid="stFileUploader"] section {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+}
+
+[data-testid="stFileUploader"] button {
+    width: 160px !important;
+    height: 40px !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+}
+
+/* Hilangkan drag area besar */
+[data-testid="stFileUploader"] div {
+    justify-content: center;
+}
+
+/* Rapikan layout atas */
+.block-container {
+    padding-top: 2rem;
+}
+
+/* Status text */
+.status-text {
+    font-size: 14px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# ======================= HEADER =============================
 # ============================================================
 
 header_col1, header_col2 = st.columns([9, 1])
@@ -19,7 +62,7 @@ with header_col1:
 
 with header_col2:
     uploaded_files = st.file_uploader(
-        "",
+        "Upload",
         type=["csv"],
         accept_multiple_files=True,
         label_visibility="collapsed"
@@ -47,10 +90,8 @@ if uploaded_files:
 
     df_uploaded = pd.concat(df_list, ignore_index=True)
 
-    # Simpan data terbaru
     df_uploaded.to_csv(DATA_FILE, index=False)
 
-    # Simpan waktu upload terakhir (lengkap tanggal + jam)
     now_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     with open(TIME_FILE, "w") as f:
         f.write(now_time)
@@ -59,22 +100,16 @@ if uploaded_files:
 # ======================= STATUS BAR =========================
 # ============================================================
 
-# ⬅️ WAKTU SEKARANG (selalu realtime saat reload)
 current_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
 status_col1, status_col2 = st.columns([6, 4])
 
 with status_col1:
     st.markdown(
-        f"""
-        <div style='font-size:14px;'>
-        🕒 Waktu Sekarang: <b>{current_time} WIB</b>
-        </div>
-        """,
+        f"<div class='status-text'>🕒 Waktu Sekarang: <b>{current_time} WIB</b></div>",
         unsafe_allow_html=True
     )
 
-# ⬅️ LAST UPDATE hanya tampil jika data benar-benar ada
 if os.path.exists(DATA_FILE) and os.path.exists(TIME_FILE):
 
     with open(TIME_FILE, "r") as f:
@@ -82,21 +117,13 @@ if os.path.exists(DATA_FILE) and os.path.exists(TIME_FILE):
 
     with status_col2:
         st.markdown(
-            f"""
-            <div style='text-align:right; font-size:14px;'>
-            ✅ Data terakhir diperbarui: <b>{last_update_time} WIB</b>
-            </div>
-            """,
+            f"<div class='status-text' style='text-align:right;'>✅ Data terakhir diperbarui: <b>{last_update_time} WIB</b></div>",
             unsafe_allow_html=True
         )
 else:
     with status_col2:
         st.markdown(
-            """
-            <div style='text-align:right; font-size:14px; color:red;'>
-            ⚠ Belum ada data diupload
-            </div>
-            """,
+            "<div class='status-text' style='text-align:right; color:red;'>⚠ Belum ada data diupload</div>",
             unsafe_allow_html=True
         )
 
@@ -107,13 +134,12 @@ st.markdown("---")
 # ============================================================
 
 if not os.path.exists(DATA_FILE):
-    st.warning("Silakan upload file CSV terlebih dahulu.")
     st.stop()
 
 df = pd.read_csv(DATA_FILE)
 
 # ============================================================
-# ======================= VALIDASI KOLOM =====================
+# ======================= VALIDASI ===========================
 # ============================================================
 
 required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
@@ -176,80 +202,20 @@ df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
 tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
 
-# ============================================================
-# ======================= TAB 1 ===============================
-# ============================================================
-
 with tab1:
-
     df_active = df[df["IS_ACTIVE"] == True].copy()
-
     st.subheader("📊 Ringkasan")
-
-    total_tiket = len(df_active)
-    df_tsel = df_active[df_active["LAYANAN"] == "TSEL"]
-
-    summary_data = {
-        "Total Tiket": total_tiket,
-        "LOW": len(df_tsel[df_tsel["SEVERITY"] == "LOW"]),
-        "MINOR": len(df_tsel[df_tsel["SEVERITY"] == "MINOR"]),
-        "MAJOR": len(df_tsel[df_tsel["SEVERITY"] == "MAJOR"]),
-        "CRITICAL": len(df_tsel[df_tsel["SEVERITY"] == "CRITICAL"]),
-        "PREMIUM": len(df_tsel[df_tsel["SEVERITY"] == "PREMIUM"]),
-    }
-
-    st.dataframe(pd.DataFrame([summary_data]), use_container_width=True)
-
-    st.subheader("📋 Data Monitoring Tiket Aktif")
-
-    df_display = df_active[
-        [
-            "INCIDENT",
-            "WITEL",
-            "LAYANAN",
-            "JENIS_GANGGUAN",
-            "SEVERITY",
-            "UMUR_TIKET_HARI"
-        ]
-    ].copy()
-
-    df_display.index = range(1, len(df_display) + 1)
-
-    st.dataframe(df_display, use_container_width=True)
-
-# ============================================================
-# ======================= TAB 2 ===============================
-# ============================================================
+    st.write(f"Total Tiket Aktif: {len(df_active)}")
+    st.dataframe(df_active, use_container_width=True)
 
 with tab2:
-
     df_close = df[df["IS_ACTIVE"] == False].copy()
-
     st.subheader("📁 Data Tiket Close")
-
-    df_close_display = df_close[
-        [
-            "INCIDENT",
-            "WITEL",
-            "SUMMARY",
-            "REPORTED DATE",
-        ]
-    ].copy()
-
-    df_close_display.index = range(1, len(df_close_display) + 1)
-
-    st.dataframe(df_close_display, use_container_width=True)
-
-# ============================================================
-# ======================= TAB 3 ===============================
-# ============================================================
+    st.dataframe(df_close, use_container_width=True)
 
 with tab3:
-
     st.subheader("⬇ Download Semua Data OSS")
-
     csv_download = df.to_csv(index=False).encode("utf-8")
-
     st.download_button(
         label="Download Semua Data (CSV)",
         data=csv_download,
