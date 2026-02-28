@@ -15,44 +15,40 @@ TIME_FILE = "last_update.txt"
 st.markdown("""
 <style>
 
-/* Uploader jadi tombol persegi panjang */
+/* ==== UBAH FILE UPLOADER JADI PERSEGI PANJANG ==== */
+
 [data-testid="stFileUploader"] {
-    width: 160px !important;
+    width: 170px !important;
 }
 
 [data-testid="stFileUploader"] section {
-    padding: 0 !important;
     border: none !important;
+    padding: 0 !important;
     background: transparent !important;
 }
 
+/* HILANGKAN TEKS DRAG & DROP */
+[data-testid="stFileUploader"] small {
+    display: none !important;
+}
+
+[data-testid="stFileUploader"] span {
+    display: none !important;
+}
+
+/* STYLE TOMBOL */
 [data-testid="stFileUploader"] button {
-    width: 160px !important;
-    height: 40px !important;
+    width: 170px !important;
+    height: 42px !important;
     border-radius: 6px !important;
     font-weight: 600 !important;
-}
-
-/* Hilangkan drag area besar */
-[data-testid="stFileUploader"] div {
-    justify-content: center;
-}
-
-/* Rapikan layout atas */
-.block-container {
-    padding-top: 2rem;
-}
-
-/* Status text */
-.status-text {
-    font-size: 14px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# ======================= HEADER =============================
+# ======================= HEADER ==============================
 # ============================================================
 
 header_col1, header_col2 = st.columns([9, 1])
@@ -62,7 +58,7 @@ with header_col1:
 
 with header_col2:
     uploaded_files = st.file_uploader(
-        "Upload",
+        "",
         type=["csv"],
         accept_multiple_files=True,
         label_visibility="collapsed"
@@ -106,7 +102,11 @@ status_col1, status_col2 = st.columns([6, 4])
 
 with status_col1:
     st.markdown(
-        f"<div class='status-text'>🕒 Waktu Sekarang: <b>{current_time} WIB</b></div>",
+        f"""
+        <div style='font-size:14px;'>
+        🕒 Waktu Sekarang: <b>{current_time} WIB</b>
+        </div>
+        """,
         unsafe_allow_html=True
     )
 
@@ -117,13 +117,21 @@ if os.path.exists(DATA_FILE) and os.path.exists(TIME_FILE):
 
     with status_col2:
         st.markdown(
-            f"<div class='status-text' style='text-align:right;'>✅ Data terakhir diperbarui: <b>{last_update_time} WIB</b></div>",
+            f"""
+            <div style='text-align:right; font-size:14px;'>
+            ✅ Data terakhir diperbarui: <b>{last_update_time} WIB</b>
+            </div>
+            """,
             unsafe_allow_html=True
         )
 else:
     with status_col2:
         st.markdown(
-            "<div class='status-text' style='text-align:right; color:red;'>⚠ Belum ada data diupload</div>",
+            """
+            <div style='text-align:right; font-size:14px; color:red;'>
+            ⚠ Belum ada data diupload
+            </div>
+            """,
             unsafe_allow_html=True
         )
 
@@ -134,12 +142,13 @@ st.markdown("---")
 # ============================================================
 
 if not os.path.exists(DATA_FILE):
+    st.warning("Silakan upload file CSV terlebih dahulu.")
     st.stop()
 
 df = pd.read_csv(DATA_FILE)
 
 # ============================================================
-# ======================= VALIDASI ===========================
+# ======================= VALIDASI KOLOM =====================
 # ============================================================
 
 required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
@@ -203,19 +212,67 @@ df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
 
 with tab1:
+
     df_active = df[df["IS_ACTIVE"] == True].copy()
+
     st.subheader("📊 Ringkasan")
-    st.write(f"Total Tiket Aktif: {len(df_active)}")
-    st.dataframe(df_active, use_container_width=True)
+
+    total_tiket = len(df_active)
+    df_tsel = df_active[df_active["LAYANAN"] == "TSEL"]
+
+    summary_data = {
+        "Total Tiket": total_tiket,
+        "LOW": len(df_tsel[df_tsel["SEVERITY"] == "LOW"]),
+        "MINOR": len(df_tsel[df_tsel["SEVERITY"] == "MINOR"]),
+        "MAJOR": len(df_tsel[df_tsel["SEVERITY"] == "MAJOR"]),
+        "CRITICAL": len(df_tsel[df_tsel["SEVERITY"] == "CRITICAL"]),
+        "PREMIUM": len(df_tsel[df_tsel["SEVERITY"] == "PREMIUM"]),
+    }
+
+    st.dataframe(pd.DataFrame([summary_data]), use_container_width=True)
+
+    st.subheader("📋 Data Monitoring Tiket Aktif")
+
+    df_display = df_active[
+        [
+            "INCIDENT",
+            "WITEL",
+            "LAYANAN",
+            "JENIS_GANGGUAN",
+            "SEVERITY",
+            "UMUR_TIKET_HARI"
+        ]
+    ].copy()
+
+    df_display.index = range(1, len(df_display) + 1)
+
+    st.dataframe(df_display, use_container_width=True)
 
 with tab2:
+
     df_close = df[df["IS_ACTIVE"] == False].copy()
+
     st.subheader("📁 Data Tiket Close")
-    st.dataframe(df_close, use_container_width=True)
+
+    df_close_display = df_close[
+        [
+            "INCIDENT",
+            "WITEL",
+            "SUMMARY",
+            "REPORTED DATE",
+        ]
+    ].copy()
+
+    df_close_display.index = range(1, len(df_close_display) + 1)
+
+    st.dataframe(df_close_display, use_container_width=True)
 
 with tab3:
+
     st.subheader("⬇ Download Semua Data OSS")
+
     csv_download = df.to_csv(index=False).encode("utf-8")
+
     st.download_button(
         label="Download Semua Data (CSV)",
         data=csv_download,
