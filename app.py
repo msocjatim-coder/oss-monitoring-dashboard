@@ -5,6 +5,40 @@ import os
 
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
+# ============================================================
+# ======================= CUSTOM UI STYLE ====================
+# ============================================================
+
+st.markdown("""
+<style>
+
+/* Perkecil tinggi box uploader */
+[data-testid="stFileUploader"] section {
+    padding: 8px 10px !important;
+    min-height: 90px !important;
+}
+
+/* Hilangkan jarak bawah uploader */
+[data-testid="stFileUploader"] {
+    margin-bottom: 0px !important;
+}
+
+/* Tulisan update */
+.update-text {
+    text-align: center;
+    font-size: 14px;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+/* Rapikan jarak atas */
+.block-container {
+    padding-top: 2rem;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
 # ================= FILE SERVER STORAGE =================
 DATA_FILE = "data_latest.csv"
 TIME_FILE = "last_update.txt"
@@ -19,6 +53,18 @@ with col1:
     st.markdown("## 📊 OSS Monitoring Dashboard")
 
 with col2:
+
+    # ================= TAMPILKAN LAST UPDATE (DI ATAS) =================
+    if os.path.exists(TIME_FILE):
+        with open(TIME_FILE, "r") as f:
+            last_update_time = f.read()
+
+        st.markdown(
+            f"<div class='update-text'>data sudah diperbarui di <b>{last_update_time} WIB</b></div>",
+            unsafe_allow_html=True
+        )
+
+    # ================= FILE UPLOADER =================
     uploaded_files = st.file_uploader(
         "",
         type=["csv"],
@@ -56,27 +102,12 @@ if uploaded_files:
     with open(TIME_FILE, "w") as f:
         f.write(now_time)
 
-# ============================================================
-# ======================= TAMPILKAN LAST UPDATE ==============
-# ============================================================
-
-if os.path.exists(TIME_FILE):
-    with open(TIME_FILE, "r") as f:
-        last_update_time = f.read()
-
-    st.markdown(
-        f"""
-        <div style='text-align:right; font-size:14px; margin-top:-10px;'>
-        data sudah diperbarui di <b>{last_update_time} WIB</b>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.rerun()
 
 st.markdown("---")
 
 # ============================================================
-# ======================= MENU TAB (KOTAK) ===================
+# ======================= MENU TAB ===========================
 # ============================================================
 
 tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
@@ -167,7 +198,7 @@ if "LAST UPDATE WORKLOG" in df.columns:
     ).dt.strftime("%H:%M:%S")
 
 # ============================================================
-# ======================= TAB 1 : TIKET AKTIF =================
+# ======================= TAB 1 ==============================
 # ============================================================
 
 with tab1:
@@ -227,7 +258,7 @@ with tab1:
     st.dataframe(styled_df, use_container_width=True)
 
 # ============================================================
-# ======================= TAB 2 : TIKET CLOSE =================
+# ======================= TAB 2 ==============================
 # ============================================================
 
 with tab2:
@@ -260,7 +291,7 @@ with tab2:
     st.dataframe(df_close_display, use_container_width=True)
 
 # ============================================================
-# ======================= TAB 3 : DOWNLOAD ====================
+# ======================= TAB 3 ==============================
 # ============================================================
 
 with tab3:
