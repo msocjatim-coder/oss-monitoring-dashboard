@@ -6,6 +6,13 @@ st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
 st.title("📊 OSS Monitoring Dashboard")
 
+# ================= MENU BAR =================
+menu = st.radio(
+    "",
+    ["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"],
+    horizontal=True
+)
+
 uploaded_files = st.file_uploader(
     "Upload Semua File CSV dari OSS (Bisa banyak sekaligus)",
     type=["csv"],
@@ -13,6 +20,7 @@ uploaded_files = st.file_uploader(
 )
 
 if uploaded_files:
+
     df_list = []
 
     for uploaded_file in uploaded_files:
@@ -37,6 +45,7 @@ if uploaded_files:
     if missing_cols:
         st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     else:
+
         df = df.drop_duplicates(subset=["INCIDENT"])
 
         df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
@@ -103,112 +112,95 @@ if uploaded_files:
                 df["LAST UPDATE WORKLOG"], errors="coerce"
             ).dt.strftime("%H:%M:%S")
 
-        # ================= FILTER =================
+        # ============================================================
+        # ======================= TIKET AKTIF =========================
+        # ============================================================
 
-        st.subheader("🔎 Filter Data")
+        if menu == "TIKET AKTIF":
 
-        col1, col2, col3, col4 = st.columns(4)
+            df_active = df[df["IS_ACTIVE"] == True].copy()
 
-        with col1:
-            witel_list = sorted(df["WITEL"].dropna().unique().tolist())
-            witel_filter = st.selectbox("Filter Witel", ["Semua"] + witel_list)
+            st.subheader("📋 Data Monitoring Tiket Aktif")
 
-        with col2:
-            layanan_filter = st.selectbox(
-                "Filter Layanan",
-                ["Semua"] + sorted(df["LAYANAN"].unique())
+            df_display = df_active[
+                [
+                    "INCIDENT",
+                    "WITEL",
+                    "LAYANAN",
+                    "SERVICE ID",
+                    "JENIS_GANGGUAN",
+                    "SEVERITY",
+                    "TTR CUSTOMER",
+                    "LAST UPDATE WORKLOG",
+                    "WORKLOG SUMMARY",
+                ]
+            ].copy()
+
+            df_display.index = range(1, len(df_display) + 1)
+
+            def highlight_severity(val):
+                color_map = {
+                    "PREMIUM": "background-color: #800000; color: white;",
+                    "CRITICAL": "background-color: red; color: white;",
+                    "MAJOR": "background-color: orange;",
+                    "MINOR": "background-color: yellow;",
+                    "LOW": "background-color: lightgreen;",
+                }
+                return color_map.get(val, "")
+
+            styled_df = df_display.style.applymap(
+                highlight_severity,
+                subset=["SEVERITY"]
             )
 
-        with col3:
-            jenis_filter = st.selectbox(
-                "Filter Jenis",
-                ["Semua"] + sorted(df["JENIS_GANGGUAN"].unique())
+            st.dataframe(styled_df, use_container_width=True)
+
+        # ============================================================
+        # ======================= TIKET CLOSE =========================
+        # ============================================================
+
+        elif menu == "TIKET CLOSE":
+
+            df_close = df[df["IS_ACTIVE"] == False].copy()
+
+            if "SALSIM" not in df_close.columns:
+                df_close["SALSIM"] = "-"
+
+            if "CLOSE" not in df_close.columns:
+                df_close["CLOSE"] = "-"
+
+            df_close["CLOSE"] = df_close["CLOSE"].fillna("-")
+
+            st.subheader("📁 Data Tiket Close")
+
+            df_close_display = df_close[
+                [
+                    "INCIDENT",
+                    "WITEL",
+                    "SUMMARY",
+                    "REPORTED DATE",
+                    "SALSIM",
+                    "CLOSE",
+                ]
+            ].copy()
+
+            df_close_display.index = range(1, len(df_close_display) + 1)
+
+            st.dataframe(df_close_display, use_container_width=True)
+
+        # ============================================================
+        # ======================= DOWNLOAD TIKET ======================
+        # ============================================================
+
+        elif menu == "DOWNLOAD TIKET":
+
+            st.subheader("⬇ Download Semua Data Tiket")
+
+            csv_download = df.to_csv(index=False).encode("utf-8")
+
+            st.download_button(
+                label="Download Semua Data OSS (CSV)",
+                data=csv_download,
+                file_name="oss_all_ticket.csv",
+                mime="text/csv"
             )
-
-        with col4:
-            severity_filter = st.selectbox(
-                "Filter Severity",
-                ["Semua"] + sorted(df["SEVERITY"].unique())
-            )
-
-        if witel_filter != "Semua":
-            df = df[df["WITEL"] == witel_filter]
-
-        if layanan_filter != "Semua":
-            df = df[df["LAYANAN"] == layanan_filter]
-
-        if jenis_filter != "Semua":
-            df = df[df["JENIS_GANGGUAN"] == jenis_filter]
-
-        if severity_filter != "Semua":
-            df = df[df["SEVERITY"] == severity_filter]
-
-        show_active_only = st.checkbox("Tampilkan hanya tiket aktif")
-
-        if show_active_only:
-            df = df[df["IS_ACTIVE"] == True]
-
-        # ================= RINGKASAN =================
-
-        st.subheader("📊 Ringkasan")
-
-        total_tiket = len(df)
-        df_tsel = df[df["LAYANAN"] == "TSEL"]
-
-        summary_data = {
-            "Total Tiket": total_tiket,
-            "LOW": len(df_tsel[df_tsel["SEVERITY"] == "LOW"]),
-            "MINOR": len(df_tsel[df_tsel["SEVERITY"] == "MINOR"]),
-            "MAJOR": len(df_tsel[df_tsel["SEVERITY"] == "MAJOR"]),
-            "CRITICAL": len(df_tsel[df_tsel["SEVERITY"] == "CRITICAL"]),
-            "PREMIUM": len(df_tsel[df_tsel["SEVERITY"] == "PREMIUM"]),
-        }
-
-        summary_df = pd.DataFrame([summary_data])
-        st.dataframe(summary_df, use_container_width=True)
-
-        # ================= DATA MONITORING =================
-
-        st.subheader("📋 Data Monitoring")
-
-        df_display = df[
-            [
-                "INCIDENT",
-                "WITEL",
-                "LAYANAN",
-                "SERVICE ID",
-                "JENIS_GANGGUAN",
-                "SEVERITY",
-                "TTR CUSTOMER",
-                "LAST UPDATE WORKLOG",
-                "WORKLOG SUMMARY",
-            ]
-        ].copy()
-
-        df_display.index = range(1, len(df_display) + 1)
-
-        def highlight_severity(val):
-            color_map = {
-                "PREMIUM": "background-color: #800000; color: white;",
-                "CRITICAL": "background-color: red; color: white;",
-                "MAJOR": "background-color: orange;",
-                "MINOR": "background-color: yellow;",
-                "LOW": "background-color: lightgreen;",
-            }
-            return color_map.get(val, "")
-
-        styled_df = df_display.style.applymap(
-            highlight_severity,
-            subset=["SEVERITY"]
-        )
-
-        st.dataframe(styled_df, use_container_width=True)
-
-        csv_download = df_display.to_csv(index=False).encode("utf-8")
-
-        st.download_button(
-            label="⬇ Download Data Monitoring (CSV)",
-            data=csv_download,
-            file_name="hasil_monitoring.csv",
-            mime="text/csv"
-        )
