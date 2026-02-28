@@ -5,69 +5,19 @@ import os
 
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
-# ============================================================
-# ======================= CUSTOM UI STYLE ====================
-# ============================================================
-
-st.markdown("""
-<style>
-
-/* Perkecil tinggi box uploader */
-[data-testid="stFileUploader"] section {
-    padding: 8px 10px !important;
-    min-height: 90px !important;
-}
-
-/* Hilangkan jarak bawah uploader */
-[data-testid="stFileUploader"] {
-    margin-bottom: 0px !important;
-}
-
-/* Tulisan update */
-.update-text {
-    text-align: center;
-    font-size: 14px;
-    margin-bottom: 6px;
-    font-weight: 500;
-}
-
-/* Rapikan jarak atas */
-.block-container {
-    padding-top: 2rem;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-# ================= FILE SERVER STORAGE =================
 DATA_FILE = "data_latest.csv"
 TIME_FILE = "last_update.txt"
 
 # ============================================================
-# ======================= HEADER LAYOUT ======================
+# ======================= HEADER ==============================
 # ============================================================
 
-col1, col2 = st.columns([8, 2])
+header_col1, header_col2 = st.columns([9, 1])
 
-with col1:
+with header_col1:
     st.markdown("## 📊 OSS Monitoring Dashboard")
 
-with col2:
-
-    # ================= TAMPILKAN LAST UPDATE =================
-    # Hanya muncul jika sudah pernah upload
-    if os.path.exists(TIME_FILE) and os.path.exists(DATA_FILE):
-
-        with open(TIME_FILE, "r") as f:
-            last_update_time = f.read().strip()
-
-        if last_update_time != "":
-            st.markdown(
-                f"<div class='update-text'>data sudah diperbarui di <b>{last_update_time} WIB</b></div>",
-                unsafe_allow_html=True
-            )
-
-    # ================= FILE UPLOADER =================
+with header_col2:
     uploaded_files = st.file_uploader(
         "",
         type=["csv"],
@@ -97,33 +47,70 @@ if uploaded_files:
 
     df_uploaded = pd.concat(df_list, ignore_index=True)
 
-    # 🔥 SIMPAN DATA GLOBAL
+    # Simpan data terbaru
     df_uploaded.to_csv(DATA_FILE, index=False)
 
-    # 🔥 SIMPAN WAKTU UPDATE
-    now_time = datetime.now().strftime("%H:%M")
+    # Simpan waktu upload terakhir (lengkap tanggal + jam)
+    now_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     with open(TIME_FILE, "w") as f:
         f.write(now_time)
 
-    st.rerun()
+# ============================================================
+# ======================= STATUS BAR =========================
+# ============================================================
+
+# ⬅️ WAKTU SEKARANG (selalu realtime saat reload)
+current_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+
+status_col1, status_col2 = st.columns([6, 4])
+
+with status_col1:
+    st.markdown(
+        f"""
+        <div style='font-size:14px;'>
+        🕒 Waktu Sekarang: <b>{current_time} WIB</b>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ⬅️ LAST UPDATE hanya tampil jika data benar-benar ada
+if os.path.exists(DATA_FILE) and os.path.exists(TIME_FILE):
+
+    with open(TIME_FILE, "r") as f:
+        last_update_time = f.read()
+
+    with status_col2:
+        st.markdown(
+            f"""
+            <div style='text-align:right; font-size:14px;'>
+            ✅ Data terakhir diperbarui: <b>{last_update_time} WIB</b>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+else:
+    with status_col2:
+        st.markdown(
+            """
+            <div style='text-align:right; font-size:14px; color:red;'>
+            ⚠ Belum ada data diupload
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
 st.markdown("---")
 
 # ============================================================
-# ======================= MENU TAB ===========================
+# ======================= LOAD DATA ==========================
 # ============================================================
 
-tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
-
-# ============================================================
-# ======================= LOAD DATA GLOBAL ===================
-# ============================================================
-
-if os.path.exists(DATA_FILE):
-    df = pd.read_csv(DATA_FILE)
-else:
-    st.warning("Belum ada data di server. Silakan upload terlebih dahulu.")
+if not os.path.exists(DATA_FILE):
+    st.warning("Silakan upload file CSV terlebih dahulu.")
     st.stop()
+
+df = pd.read_csv(DATA_FILE)
 
 # ============================================================
 # ======================= VALIDASI KOLOM =====================
@@ -137,7 +124,7 @@ if missing_cols:
     st.stop()
 
 # ============================================================
-# ======================= PROCESSING (TIDAK DIUBAH) ==========
+# ======================= PROCESSING =========================
 # ============================================================
 
 df = df.drop_duplicates(subset=["INCIDENT"])
@@ -183,25 +170,14 @@ def detect_severity(summary):
 
 df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
-if "TTR CUSTOMER" in df.columns:
-    def format_ttr(val):
-        try:
-            parts = str(val).split(":")
-            hours = int(parts[0])
-            minutes = int(parts[1])
-            return f"{hours} jam {minutes} menit"
-        except:
-            return val
+# ============================================================
+# ======================= TABS ===============================
+# ============================================================
 
-    df["TTR CUSTOMER"] = df["TTR CUSTOMER"].apply(format_ttr)
-
-if "LAST UPDATE WORKLOG" in df.columns:
-    df["LAST UPDATE WORKLOG"] = pd.to_datetime(
-        df["LAST UPDATE WORKLOG"], errors="coerce"
-    ).dt.strftime("%H:%M:%S")
+tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
 
 # ============================================================
-# ======================= TAB 1 ==============================
+# ======================= TAB 1 ===============================
 # ============================================================
 
 with tab1:
@@ -222,8 +198,7 @@ with tab1:
         "PREMIUM": len(df_tsel[df_tsel["SEVERITY"] == "PREMIUM"]),
     }
 
-    summary_df = pd.DataFrame([summary_data])
-    st.dataframe(summary_df, use_container_width=True)
+    st.dataframe(pd.DataFrame([summary_data]), use_container_width=True)
 
     st.subheader("📋 Data Monitoring Tiket Aktif")
 
@@ -232,49 +207,23 @@ with tab1:
             "INCIDENT",
             "WITEL",
             "LAYANAN",
-            "SERVICE ID",
             "JENIS_GANGGUAN",
             "SEVERITY",
-            "TTR CUSTOMER",
-            "LAST UPDATE WORKLOG",
-            "WORKLOG SUMMARY",
+            "UMUR_TIKET_HARI"
         ]
     ].copy()
 
     df_display.index = range(1, len(df_display) + 1)
 
-    def highlight_severity(val):
-        color_map = {
-            "PREMIUM": "background-color: #800000; color: white;",
-            "CRITICAL": "background-color: red; color: white;",
-            "MAJOR": "background-color: orange;",
-            "MINOR": "background-color: yellow;",
-            "LOW": "background-color: lightgreen;",
-        }
-        return color_map.get(val, "")
-
-    styled_df = df_display.style.applymap(
-        highlight_severity,
-        subset=["SEVERITY"]
-    )
-
-    st.dataframe(styled_df, use_container_width=True)
+    st.dataframe(df_display, use_container_width=True)
 
 # ============================================================
-# ======================= TAB 2 ==============================
+# ======================= TAB 2 ===============================
 # ============================================================
 
 with tab2:
 
     df_close = df[df["IS_ACTIVE"] == False].copy()
-
-    if "SALSIM" not in df_close.columns:
-        df_close["SALSIM"] = "-"
-
-    if "CLOSE" not in df_close.columns:
-        df_close["CLOSE"] = "-"
-
-    df_close["CLOSE"] = df_close["CLOSE"].fillna("-")
 
     st.subheader("📁 Data Tiket Close")
 
@@ -284,8 +233,6 @@ with tab2:
             "WITEL",
             "SUMMARY",
             "REPORTED DATE",
-            "SALSIM",
-            "CLOSE",
         ]
     ].copy()
 
@@ -294,7 +241,7 @@ with tab2:
     st.dataframe(df_close_display, use_container_width=True)
 
 # ============================================================
-# ======================= TAB 3 ==============================
+# ======================= TAB 3 ===============================
 # ============================================================
 
 with tab3:
