@@ -9,39 +9,30 @@ DATA_FILE = "data_latest.csv"
 TIME_FILE = "last_update.txt"
 
 # ============================================================
-# ======================= CUSTOM CSS (ONLY UI FIX) ===========
+# ======================= CUSTOM CSS (SAFE UI ONLY) ==========
 # ============================================================
 
 st.markdown("""
 <style>
 
-/* ==== UBAH FILE UPLOADER JADI PERSEGI PANJANG ==== */
-
+/* Perkecil lebar area uploader supaya lebih efisien */
 [data-testid="stFileUploader"] {
-    width: 180px !important;
+    max-width: 260px !important;
 }
 
+/* Buat kotak lebih pendek (persegi panjang) */
 [data-testid="stFileUploader"] section {
-    border: none !important;
-    padding: 0 !important;
-    background: transparent !important;
+    padding: 8px 12px 8px 12px !important;
 }
 
-/* HILANGKAN TEKS DRAG & DROP YANG KEPOONG */
+/* Atur tinggi agar tidak terlalu besar */
+[data-testid="stFileUploader"] div[role="button"] {
+    min-height: 60px !important;
+}
+
+/* Rapikan teks agar tidak kepotong */
 [data-testid="stFileUploader"] small {
-    display: none !important;
-}
-
-[data-testid="stFileUploader"] span {
-    display: none !important;
-}
-
-/* STYLE TOMBOL */
-[data-testid="stFileUploader"] button {
-    width: 180px !important;
-    height: 42px !important;
-    border-radius: 6px !important;
-    font-weight: 600 !important;
+    font-size: 12px !important;
 }
 
 </style>
@@ -86,10 +77,8 @@ if uploaded_files:
 
     df_uploaded = pd.concat(df_list, ignore_index=True)
 
-    # Simpan data terbaru
     df_uploaded.to_csv(DATA_FILE, index=False)
 
-    # Simpan waktu upload terakhir
     now_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     with open(TIME_FILE, "w") as f:
         f.write(now_time)
@@ -170,10 +159,6 @@ df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
 tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
 
-# ============================================================
-# ======================= TAB 1 ===============================
-# ============================================================
-
 with tab1:
 
     df_active = df[df["IS_ACTIVE"] == True].copy()
@@ -211,10 +196,6 @@ with tab1:
 
     st.dataframe(df_display, use_container_width=True)
 
-# ============================================================
-# ======================= TAB 2 ===============================
-# ============================================================
-
 with tab2:
 
     df_close = df[df["IS_ACTIVE"] == False].copy()
@@ -233,10 +214,6 @@ with tab2:
     df_close_display.index = range(1, len(df_close_display) + 1)
 
     st.dataframe(df_close_display, use_container_width=True)
-
-# ============================================================
-# ======================= TAB 3 ===============================
-# ============================================================
 
 with tab3:
 
