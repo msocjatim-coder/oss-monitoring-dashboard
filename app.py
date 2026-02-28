@@ -5,21 +5,31 @@ import os
 
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
-st.title("📊 OSS Monitoring Dashboard")
-
 # ================= FILE SERVER STORAGE =================
 DATA_FILE = "data_latest.csv"
+TIME_FILE = "last_update.txt"
 
-# ================= MENU TAB (KOTAK) =================
-tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
+# ============================================================
+# ======================= HEADER LAYOUT ======================
+# ============================================================
 
-uploaded_files = st.file_uploader(
-    "Upload Semua File CSV dari OSS (Bisa banyak sekaligus)",
-    type=["csv"],
-    accept_multiple_files=True
-)
+col1, col2 = st.columns([8, 2])
 
-# ================= JIKA ADA UPLOAD → SIMPAN KE SERVER =================
+with col1:
+    st.markdown("## 📊 OSS Monitoring Dashboard")
+
+with col2:
+    uploaded_files = st.file_uploader(
+        "",
+        type=["csv"],
+        accept_multiple_files=True,
+        label_visibility="collapsed"
+    )
+
+# ============================================================
+# ======================= HANDLE UPLOAD ======================
+# ============================================================
+
 if uploaded_files:
 
     df_list = []
@@ -38,19 +48,53 @@ if uploaded_files:
 
     df_uploaded = pd.concat(df_list, ignore_index=True)
 
-    # 🔥 SIMPAN KE FILE SERVER
+    # 🔥 SIMPAN DATA GLOBAL
     df_uploaded.to_csv(DATA_FILE, index=False)
 
-    st.success(f"{len(uploaded_files)} file berhasil digabung & disimpan ke server!")
+    # 🔥 SIMPAN WAKTU UPDATE
+    now_time = datetime.now().strftime("%H:%M")
+    with open(TIME_FILE, "w") as f:
+        f.write(now_time)
 
-# ================= LOAD DATA GLOBAL =================
+# ============================================================
+# ======================= TAMPILKAN LAST UPDATE ==============
+# ============================================================
+
+if os.path.exists(TIME_FILE):
+    with open(TIME_FILE, "r") as f:
+        last_update_time = f.read()
+
+    st.markdown(
+        f"""
+        <div style='text-align:right; font-size:14px; margin-top:-10px;'>
+        data sudah diperbarui di <b>{last_update_time} WIB</b>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+st.markdown("---")
+
+# ============================================================
+# ======================= MENU TAB (KOTAK) ===================
+# ============================================================
+
+tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
+
+# ============================================================
+# ======================= LOAD DATA GLOBAL ===================
+# ============================================================
+
 if os.path.exists(DATA_FILE):
     df = pd.read_csv(DATA_FILE)
 else:
     st.warning("Belum ada data di server. Silakan upload terlebih dahulu.")
     st.stop()
 
-# ================= VALIDASI KOLOM =================
+# ============================================================
+# ======================= VALIDASI KOLOM =====================
+# ============================================================
+
 required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
 missing_cols = [col for col in required_columns if col not in df.columns]
 
@@ -58,7 +102,9 @@ if missing_cols:
     st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     st.stop()
 
-# ================= PROCESSING (TIDAK DIUBAH) =================
+# ============================================================
+# ======================= PROCESSING (TIDAK DIUBAH) ==========
+# ============================================================
 
 df = df.drop_duplicates(subset=["INCIDENT"])
 
@@ -103,7 +149,6 @@ def detect_severity(summary):
 
 df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
-# FORMAT TTR
 if "TTR CUSTOMER" in df.columns:
     def format_ttr(val):
         try:
@@ -116,7 +161,6 @@ if "TTR CUSTOMER" in df.columns:
 
     df["TTR CUSTOMER"] = df["TTR CUSTOMER"].apply(format_ttr)
 
-# FORMAT LAST UPDATE
 if "LAST UPDATE WORKLOG" in df.columns:
     df["LAST UPDATE WORKLOG"] = pd.to_datetime(
         df["LAST UPDATE WORKLOG"], errors="coerce"
