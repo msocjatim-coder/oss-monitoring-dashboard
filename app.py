@@ -54,15 +54,18 @@ with col1:
 
 with col2:
 
-    # ================= TAMPILKAN LAST UPDATE (DI ATAS) =================
-    if os.path.exists(TIME_FILE):
-        with open(TIME_FILE, "r") as f:
-            last_update_time = f.read()
+    # ================= TAMPILKAN LAST UPDATE =================
+    # Hanya muncul jika sudah pernah upload
+    if os.path.exists(TIME_FILE) and os.path.exists(DATA_FILE):
 
-        st.markdown(
-            f"<div class='update-text'>data sudah diperbarui di <b>{last_update_time} WIB</b></div>",
-            unsafe_allow_html=True
-        )
+        with open(TIME_FILE, "r") as f:
+            last_update_time = f.read().strip()
+
+        if last_update_time != "":
+            st.markdown(
+                f"<div class='update-text'>data sudah diperbarui di <b>{last_update_time} WIB</b></div>",
+                unsafe_allow_html=True
+            )
 
     # ================= FILE UPLOADER =================
     uploaded_files = st.file_uploader(
