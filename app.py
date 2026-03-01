@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
-import uuid
 
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
@@ -76,7 +75,6 @@ with col1:
     st.title("📊 OSS Monitoring Dashboard")
 
 with col2:
-    # Upload hanya muncul jika tidak ada popup aktif
     if st.session_state.selected_message is None:
         uploaded_files = st.file_uploader(
             "",
@@ -258,17 +256,16 @@ with tab1:
         ]
     ].copy()
 
+    df_display["TANYA"] = ""  # kolom baru
+
     df_display.index = range(1, len(df_display) + 1)
 
     st.dataframe(df_display, use_container_width=True)
 
-    st.markdown("### 📑 Aksi")
-
+    # tombol sesuai kolom TANYA
     for i, row in df_display.iterrows():
-        col_label, col_button = st.columns([8,2])
 
-        with col_label:
-            st.write(f"Baris {i}")
+        col_spacer, col_button = st.columns([9,1])
 
         with col_button:
             if st.button("Tanya", key=f"tanya_{i}"):
