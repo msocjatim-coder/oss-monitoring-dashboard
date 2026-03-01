@@ -44,35 +44,6 @@ st.markdown("""
 /* Animasi kedap-kedip */
 @keyframes blink {0% { opacity: 1; }50% { opacity: 0.2; }100% { opacity: 1; }}
 .blink-text { animation: blink 1.2s infinite; font-weight: bold; color: white; font-size: 16px; text-align: center; }
-
-/* ===== SCROLLABLE TABLE ===== */
-.scrollable-table {
-    max-height: 500px;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    padding: 5px;
-}
-.row-table {
-    display: flex;
-    align-items: center;
-    padding: 4px 0;
-    border-bottom: 1px solid #eee;
-}
-.cell-table {
-    flex: 1;
-    padding: 0 6px;
-    word-break: break-word;
-}
-.cell-button {
-    flex: 0 0 90px;
-    padding-left: 6px;
-}
-.header-table {
-    display: flex;
-    font-weight: bold;
-    padding: 4px 0;
-    border-bottom: 2px solid #aaa;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -174,7 +145,7 @@ df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
 
 # ============================================================
-# ======================= TIKET AKTIF SCROLLABLE ============
+# ======================= TIKET AKTIF ========================
 # ============================================================
 
 with tab1:
@@ -182,7 +153,8 @@ with tab1:
     df_display = df_active[["INCIDENT","WITEL","LAYANAN","SERVICE ID","JENIS_GANGGUAN","SEVERITY",
                             "TTR CUSTOMER","LAST UPDATE WORKLOG","WORKLOG SUMMARY"]].copy()
     
-    # Format TTR CUSTOMER
+    # ========================== UPDATE TTR CUSTOMER ==========================
+    # Format TTR CUSTOMER menjadi X hari Y jam Z menit jika > 24 jam
     def format_ttr_customer(ttr):
         if not isinstance(ttr, str) or not ttr: 
             return ttr
@@ -196,12 +168,15 @@ with tab1:
             return f"{days} hari {hours} jam {minutes} menit"
         else:
             return f"{hours} jam {minutes} menit"
-    df_display["TTR CUSTOMER"] = df_display["TTR CUSTOMER"].apply(format_ttr_customer)
 
+    df_display["TTR CUSTOMER"] = df_display["TTR CUSTOMER"].apply(format_ttr_customer)
+    # ==========================================================================
+
+    # Format LAST UPDATE WORKLOG: 2026-03-01 08:11:49.399 → 08:11
     df_display["LAST UPDATE WORKLOG"] = pd.to_datetime(df_display["LAST UPDATE WORKLOG"], errors='coerce').dt.strftime('%H:%M')
+
     df_display.index = range(1, len(df_display)+1)
 
-    # Highlight severity
     def highlight_severity_column(val):
         color_map = {"PREMIUM":"background-color:#800000;color:white;",
                      "CRITICAL":"background-color:red;color:white;",
@@ -210,30 +185,8 @@ with tab1:
                      "LOW":"background-color:lightgreen;"}
         return color_map.get(val,"")
 
-    # Scrollable container
-    with st.container():
-        st.markdown('<div class="scrollable-table">', unsafe_allow_html=True)
-        # Header
-        header_cols = st.columns([1,1,1,1,1,1,1,1,3,1])
-        headers = ["INCIDENT","WITEL","LAYANAN","SERVICE ID","JENIS_GANGGUAN","SEVERITY",
-                   "TTR CUSTOMER","LAST UPDATE WORKLOG","WORKLOG SUMMARY","Tanya?"]
-        for col, h in zip(header_cols, headers):
-            col.markdown(f"**{h}**")
-        # Rows
-        for i, row in df_display.iterrows():
-            row_cols = st.columns([1,1,1,1,1,1,1,1,3,1])
-            row_cols[0].write(row["INCIDENT"])
-            row_cols[1].write(row["WITEL"])
-            row_cols[2].write(row["LAYANAN"])
-            row_cols[3].write(row["SERVICE ID"])
-            row_cols[4].write(row["JENIS_GANGGUAN"])
-            row_cols[5].markdown(f'<div style="{highlight_severity_column(row["SEVERITY"])}">{row["SEVERITY"]}</div>', unsafe_allow_html=True)
-            row_cols[6].write(row["TTR CUSTOMER"])
-            row_cols[7].write(row["LAST UPDATE WORKLOG"])
-            row_cols[8].write(row["WORKLOG SUMMARY"])
-            if row_cols[9].button("Tanya?", key=f"tanya_{row['INCIDENT']}"):
-                st.info(f"Tanya button ditekan untuk tiket: {row['INCIDENT']}")
-        st.markdown('</div>', unsafe_allow_html=True)
+    styled_df = df_display.style.applymap(highlight_severity_column, subset=["SEVERITY"])
+    st.dataframe(styled_df, use_container_width=True)
 
 # ============================================================
 # ======================= TIKET CLOSE ========================
