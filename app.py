@@ -3,13 +3,13 @@ import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
+import uuid
 
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
 DATA_FILE = "oss_data_shared.csv"
 TIME_FILE = "last_update_time.txt"
 
-# ================= WIB TIMEZONE FIX =================
 wib = ZoneInfo("Asia/Jakarta")
 
 # ============================================================
@@ -19,7 +19,6 @@ wib = ZoneInfo("Asia/Jakarta")
 st.markdown("""
 <style>
 
-/* Upload button jadi persegi panjang & efisien */
 [data-testid="stFileUploader"] {
     max-width: 260px;
 }
@@ -33,7 +32,6 @@ st.markdown("""
     border-radius: 8px;
 }
 
-/* Animasi kedap-kedip */
 @keyframes blink {
     0% { opacity: 1; }
     50% { opacity: 0.2; }
@@ -48,18 +46,18 @@ st.markdown("""
     text-align: center;
 }
 
-.copy-btn {
-    background-color: #4CAF50;
+.copy-button {
+    background-color: #2196F3;
     color: white;
     border: none;
-    padding: 4px 10px;
+    padding: 5px 10px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 12px;
 }
 
-.copy-btn:hover {
-    background-color: #45a049;
+.copy-button:hover {
+    background-color: #0b7dda;
 }
 
 </style>
@@ -122,7 +120,7 @@ if not os.path.exists(DATA_FILE):
 df = pd.read_csv(DATA_FILE)
 
 # ============================================================
-# ======================= TAMPILKAN JAM UPDATE ===============
+# ======================= JAM UPDATE =========================
 # ============================================================
 
 if os.path.exists(TIME_FILE):
@@ -149,7 +147,7 @@ if missing_cols:
     st.stop()
 
 # ============================================================
-# ======================= PROCESSING (TIDAK DIUBAH) ==========
+# ======================= PROCESSING =========================
 # ============================================================
 
 df = df.drop_duplicates(subset=["INCIDENT"])
@@ -227,23 +225,29 @@ with tab1:
         ]
     ].copy()
 
+    df_display["📑"] = ""
+
     df_display.index = range(1, len(df_display) + 1)
 
-    st.markdown("### TIKET AKTIF")
+    styled_df = df_display.style.set_properties(**{
+        "border": "1px solid #444"
+    })
 
+    st.dataframe(styled_df, use_container_width=True)
+
+    # ===== AUTO COPY BUTTONS =====
     for i, row in df_display.iterrows():
 
-        cols = st.columns(len(df_display.columns) + 1)
+        copy_text = f"mohon dibantu kembali info progres saat ini 🙏\nupdate terakhir : {row['WORKLOG SUMMARY']}"
 
-        for idx, col in enumerate(df_display.columns):
-            cols[idx].write(row[col])
+        button_id = str(uuid.uuid4()).replace("-", "")
 
-        copy_text = f"""mohon dibantu kembali info progres saat ini 🙏
-update terakhir : {row["WORKLOG SUMMARY"]}"""
-
-        if cols[-1].button("copy", key=f"copy_{i}"):
-            st.code(copy_text)
-            st.success("Teks siap di-copy dan paste ke teknisi 👍")
+        st.markdown(f"""
+        <button class="copy-button"
+        onclick="navigator.clipboard.writeText(`{copy_text}`)">
+        Copy 📑 Baris {i}
+        </button>
+        """, unsafe_allow_html=True)
 
 # ============================================================
 # ======================= TIKET CLOSE ========================
