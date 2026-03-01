@@ -2,54 +2,50 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
+import pytz
 
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
 DATA_FILE = "oss_data_shared.csv"
 TIME_FILE = "last_update_time.txt"
 
-# ============================================================
-# ======================= CUSTOM CSS =========================
-# ============================================================
+# ======================= TIMEZONE WIB =======================
+wib = pytz.timezone("Asia/Jakarta")
 
+# ======================= CUSTOM CSS =========================
 st.markdown("""
 <style>
 
-/* Upload button jadi persegi panjang & efisien */
+/* Upload button persegi panjang */
 [data-testid="stFileUploader"] {
     max-width: 260px;
 }
-
 [data-testid="stFileUploader"] section {
     padding: 6px 12px 6px 12px;
 }
-
 [data-testid="stFileUploader"] div[role="button"] {
     min-height: 55px;
     border-radius: 8px;
 }
 
-/* Animasi kedap-kedip */
+/* Blink putih */
 @keyframes blink {
     0% { opacity: 1; }
-    50% { opacity: 0.2; }
+    50% { opacity: 0.3; }
     100% { opacity: 1; }
 }
 
 .blink-text {
     animation: blink 1.2s infinite;
     font-weight: bold;
-    color: red;
+    color: white;
     font-size: 16px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# ============================================================
 # ======================= HEADER =============================
-# ============================================================
-
 col1, col2 = st.columns([8, 2])
 
 with col1:
@@ -63,10 +59,7 @@ with col2:
         label_visibility="collapsed"
     )
 
-# ============================================================
 # ======================= HANDLE UPLOAD ======================
-# ============================================================
-
 if uploaded_files:
     df_list = []
 
@@ -85,26 +78,20 @@ if uploaded_files:
     df = pd.concat(df_list, ignore_index=True)
     df.to_csv(DATA_FILE, index=False)
 
-    now_time = datetime.now().strftime("%H:%M")
+    now_time = datetime.now(wib).strftime("%H:%M")
     with open(TIME_FILE, "w") as f:
         f.write(now_time)
 
     st.success("Data berhasil diperbarui & tersimpan.")
 
-# ============================================================
 # ======================= LOAD DATA ==========================
-# ============================================================
-
 if not os.path.exists(DATA_FILE):
     st.warning("Belum ada data. Silakan upload terlebih dahulu.")
     st.stop()
 
 df = pd.read_csv(DATA_FILE)
 
-# ============================================================
 # ======================= TAMPILKAN JAM UPDATE ===============
-# ============================================================
-
 if os.path.exists(TIME_FILE):
     with open(TIME_FILE, "r") as f:
         last_update = f.read().strip()
@@ -118,10 +105,7 @@ st.markdown(
 
 st.markdown("---")
 
-# ============================================================
 # ======================= VALIDASI ===========================
-# ============================================================
-
 required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
 missing_cols = [col for col in required_columns if col not in df.columns]
 
@@ -129,14 +113,10 @@ if missing_cols:
     st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     st.stop()
 
-# ============================================================
 # ======================= PROCESSING (TIDAK DIUBAH) ==========
-# ============================================================
-
 df = df.drop_duplicates(subset=["INCIDENT"])
-
 df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
-df["UMUR_TIKET_HARI"] = (datetime.now() - df["REPORTED DATE"]).dt.days
+df["UMUR_TIKET_HARI"] = (datetime.now(wib) - df["REPORTED DATE"]).dt.days
 
 df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
     ["closed", "resolved", "cancel"]
@@ -176,59 +156,41 @@ def detect_severity(summary):
 
 df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
-# ============================================================
-# ======================= MENU BAR ===========================
-# ============================================================
-
+# ======================= MENU ===============================
 tab1, tab2, tab3 = st.tabs(
     ["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"]
 )
 
-# ============================================================
 # ======================= TIKET AKTIF ========================
-# ============================================================
-
 with tab1:
 
     df_active = df[df["IS_ACTIVE"] == True].copy()
 
-    df_display = df_active[
-        [
-            "INCIDENT",
-            "WITEL",
-            "LAYANAN",
-            "SERVICE ID",
-            "JENIS_GANGGUAN",
-            "SEVERITY",
-            "TTR CUSTOMER",
-            "LAST UPDATE WORKLOG",
-            "WORKLOG SUMMARY",
-        ]
-    ].copy()
+    st.subheader("📋 Data Monitoring Tiket Aktif")
 
-    df_display.index = range(1, len(df_display) + 1)
+    for i, row in df_active.iterrows():
+        col_main, col_copy = st.columns([20, 1])
 
-    def highlight_severity_column(val):
-        color_map = {
-            "PREMIUM": "background-color: #800000; color: white;",
-            "CRITICAL": "background-color: red; color: white;",
-            "MAJOR": "background-color: orange;",
-            "MINOR": "background-color: yellow;",
-            "LOW": "background-color: lightgreen;",
-        }
-        return color_map.get(val, "")
+        with col_main:
+            st.write({
+                "INCIDENT": row.get("INCIDENT"),
+                "WITEL": row.get("WITEL"),
+                "LAYANAN": row.get("LAYANAN"),
+                "SERVICE ID": row.get("SERVICE ID"),
+                "JENIS_GANGGUAN": row.get("JENIS_GANGGUAN"),
+                "SEVERITY": row.get("SEVERITY"),
+                "TTR CUSTOMER": row.get("TTR CUSTOMER"),
+                "LAST UPDATE WORKLOG": row.get("LAST UPDATE WORKLOG"),
+                "WORKLOG SUMMARY": row.get("WORKLOG SUMMARY")
+            })
 
-    styled_df = df_display.style.applymap(
-        highlight_severity_column,
-        subset=["SEVERITY"]
-    )
+        with col_copy:
+            copy_text = f"""mohon dibantu kembali info progres saat ini 🙏
+update terakhir : {row.get("WORKLOG SUMMARY", "")}"""
 
-    st.dataframe(styled_df, use_container_width=True)
+            st.code(copy_text, language="")
 
-# ============================================================
 # ======================= TIKET CLOSE ========================
-# ============================================================
-
 with tab2:
 
     df_close = df[df["IS_ACTIVE"] == False].copy()
@@ -256,10 +218,7 @@ with tab2:
 
     st.dataframe(df_close_display, use_container_width=True)
 
-# ============================================================
 # ======================= DOWNLOAD ===========================
-# ============================================================
-
 with tab3:
 
     csv_download = df.to_csv(index=False).encode("utf-8")
