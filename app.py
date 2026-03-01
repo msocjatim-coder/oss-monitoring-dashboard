@@ -1,12 +1,16 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
 DATA_FILE = "oss_data_shared.csv"
 TIME_FILE = "last_update_time.txt"
+
+# ================= WIB TIMEZONE FIX =================
+wib = ZoneInfo("Asia/Jakarta")
 
 # ============================================================
 # ======================= CUSTOM CSS =========================
@@ -39,8 +43,9 @@ st.markdown("""
 .blink-text {
     animation: blink 1.2s infinite;
     font-weight: bold;
-    color: red;
+    color: white;   /* ✅ SEKARANG PUTIH */
     font-size: 16px;
+    text-align: center;
 }
 
 </style>
@@ -85,7 +90,9 @@ if uploaded_files:
     df = pd.concat(df_list, ignore_index=True)
     df.to_csv(DATA_FILE, index=False)
 
-    now_time = datetime.now().strftime("%H:%M")
+    # ✅ FIX WIB TIME
+    now_time = datetime.now(wib).strftime("%H:%M")
+
     with open(TIME_FILE, "w") as f:
         f.write(now_time)
 
@@ -108,13 +115,13 @@ df = pd.read_csv(DATA_FILE)
 if os.path.exists(TIME_FILE):
     with open(TIME_FILE, "r") as f:
         last_update = f.read().strip()
-else:
-    last_update = "-"
 
-st.markdown(
-    f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>',
-    unsafe_allow_html=True
-)
+    # hanya tampil jika ada isi valid
+    if last_update:
+        st.markdown(
+            f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>',
+            unsafe_allow_html=True
+        )
 
 st.markdown("---")
 
@@ -136,7 +143,12 @@ if missing_cols:
 df = df.drop_duplicates(subset=["INCIDENT"])
 
 df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
-df["UMUR_TIKET_HARI"] = (datetime.now() - df["REPORTED DATE"]).dt.days
+
+# ✅ FIX error datetime conflict
+df["REPORTED DATE"] = df["REPORTED DATE"].dt.tz_localize(None)
+now_naive = datetime.now(wib).replace(tzinfo=None)
+
+df["UMUR_TIKET_HARI"] = (now_naive - df["REPORTED DATE"]).dt.days
 
 df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
     ["closed", "resolved", "cancel"]
