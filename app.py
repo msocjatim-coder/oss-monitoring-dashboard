@@ -37,26 +37,20 @@ st.markdown("""
     margin-left: 10px;
 }
 
-/* ===== TABLE STYLE ===== */
-.custom-table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 14px;
-}
-
-.custom-table th, .custom-table td {
+/* ===== TABLE BORDER STYLE ===== */
+.table-header {
+    font-weight: bold;
     border: 1px solid #444;
-    padding: 6px 8px;
-    text-align: left;
-}
-
-.custom-table th {
+    padding: 6px;
     background-color: #1f2937;
     color: white;
+    text-align: center;
 }
 
-.custom-table tr:nth-child(even) {
-    background-color: #111827;
+.table-cell {
+    border: 1px solid #444;
+    padding: 6px;
+    font-size: 13px;
 }
 
 /* ===== BLINK UPDATE ===== */
@@ -280,37 +274,34 @@ with tab1:
 
     df_display.index = range(1, len(df_display) + 1)
 
-    # ==== TABLE HEADER ====
-    html = '<table class="custom-table"><tr>'
-    for col in df_display.columns:
-        html += f"<th>{col}</th>"
-    html += "<th>TANYA</th></tr>"
+    # ===== HEADER ROW =====
+    header_cols = st.columns([1,1,1,1,1,1,1,1,2,1])
+    headers = list(df_display.columns) + ["TANYA"]
 
-    # ==== TABLE ROWS ====
+    for col, header in zip(header_cols, headers):
+        col.markdown(f"<div class='table-header'>{header}</div>", unsafe_allow_html=True)
+
+    # ===== DATA ROWS =====
     for i, row in df_display.iterrows():
-        html += "<tr>"
-        for value in row:
-            html += f"<td>{value}</td>"
-        html += f"<td>👉 Gunakan tombol di bawah (No {i})</td>"
-        html += "</tr>"
 
-    html += "</table>"
+        cols = st.columns([1,1,1,1,1,1,1,1,2,1])
 
-    st.markdown(html, unsafe_allow_html=True)
-
-    st.markdown("")
-
-    # ==== TOMBOL TANYA (semua data pasti tampil) ====
-    for i, row in df_display.iterrows():
-        if st.button(f"Tanya - {row['INCIDENT']}", key=f"tanya_{i}"):
-
-            message = (
-                "mohon dibantu kembali info progres saat ini 🙏\n"
-                f"update terakhir : {row['WORKLOG SUMMARY']}"
+        for idx, value in enumerate(row):
+            cols[idx].markdown(
+                f"<div class='table-cell'>{value}</div>",
+                unsafe_allow_html=True
             )
 
-            st.session_state.selected_message = message
-            st.rerun()
+        with cols[-1]:
+            if st.button("Tanya", key=f"tanya_{i}"):
+
+                message = (
+                    "mohon dibantu kembali info progres saat ini 🙏\n"
+                    f"update terakhir : {row['WORKLOG SUMMARY']}"
+                )
+
+                st.session_state.selected_message = message
+                st.rerun()
 
 # ============================================================
 # ======================= TIKET CLOSE ========================
