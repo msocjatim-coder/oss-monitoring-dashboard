@@ -25,23 +25,41 @@ if "selected_message" not in st.session_state:
 st.markdown("""
 <style>
 
-/* === FILE UPLOADER FIX: browse sejajar drag text === */
+/* ===== FILE UPLOADER ===== */
 [data-testid="stFileUploader"] section {
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px 8px 12px;
 }
 
 [data-testid="stFileUploader"] div[role="button"] {
     margin-left: 10px;
-    height: 38px;
-    display: flex;
-    align-items: center;
 }
 
-/* === Animasi Jam Update === */
+/* ===== TABLE STYLE ===== */
+.custom-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14px;
+}
+
+.custom-table th, .custom-table td {
+    border: 1px solid #444;
+    padding: 6px 8px;
+    text-align: left;
+}
+
+.custom-table th {
+    background-color: #1f2937;
+    color: white;
+}
+
+.custom-table tr:nth-child(even) {
+    background-color: #111827;
+}
+
+/* ===== BLINK UPDATE ===== */
 @keyframes blink {
     0% { opacity: 1; }
     50% { opacity: 0.2; }
@@ -90,7 +108,7 @@ with col2:
         uploaded_files = None
 
 # ============================================================
-# ======================= POPUP AREA =========================
+# ======================= POPUP ==============================
 # ============================================================
 
 if st.session_state.selected_message:
@@ -102,7 +120,7 @@ if st.session_state.selected_message:
         unsafe_allow_html=True
     )
 
-    col_copy, col_close = st.columns([1,1])
+    col_copy, col_close = st.columns(2)
 
     with col_copy:
         if st.button("Copy Pesan"):
@@ -231,7 +249,7 @@ def detect_severity(summary):
 df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
 # ============================================================
-# ======================= MENU BAR ===========================
+# ======================= MENU ===============================
 # ============================================================
 
 tab1, tab2, tab3 = st.tabs(
@@ -262,29 +280,37 @@ with tab1:
 
     df_display.index = range(1, len(df_display) + 1)
 
-    header_cols = st.columns([1,1,1,1,1,1,1,1,2,1])
-    headers = list(df_display.columns) + ["TANYA"]
+    # ==== TABLE HEADER ====
+    html = '<table class="custom-table"><tr>'
+    for col in df_display.columns:
+        html += f"<th>{col}</th>"
+    html += "<th>TANYA</th></tr>"
 
-    for col, header in zip(header_cols, headers):
-        col.markdown(f"**{header}**")
-
+    # ==== TABLE ROWS ====
     for i, row in df_display.iterrows():
+        html += "<tr>"
+        for value in row:
+            html += f"<td>{value}</td>"
+        html += f"<td>👉 Gunakan tombol di bawah (No {i})</td>"
+        html += "</tr>"
 
-        cols = st.columns([1,1,1,1,1,1,1,1,2,1])
+    html += "</table>"
 
-        for idx, value in enumerate(row):
-            cols[idx].write(value)
+    st.markdown(html, unsafe_allow_html=True)
 
-        with cols[-1]:
-            if st.button("Tanya", key=f"tanya_{i}"):
+    st.markdown("")
 
-                message = (
-                    "mohon dibantu kembali info progres saat ini 🙏\n"
-                    f"update terakhir : {row['WORKLOG SUMMARY']}"
-                )
+    # ==== TOMBOL TANYA (semua data pasti tampil) ====
+    for i, row in df_display.iterrows():
+        if st.button(f"Tanya - {row['INCIDENT']}", key=f"tanya_{i}"):
 
-                st.session_state.selected_message = message
-                st.rerun()
+            message = (
+                "mohon dibantu kembali info progres saat ini 🙏\n"
+                f"update terakhir : {row['WORKLOG SUMMARY']}"
+            )
+
+            st.session_state.selected_message = message
+            st.rerun()
 
 # ============================================================
 # ======================= TIKET CLOSE ========================
@@ -293,29 +319,7 @@ with tab1:
 with tab2:
 
     df_close = df[df["IS_ACTIVE"] == False].copy()
-
-    if "CLOSE" not in df_close.columns:
-        df_close["CLOSE"] = "-"
-
-    df_close["CLOSE"] = df_close["CLOSE"].fillna("-")
-
-    if "SALSIM" not in df_close.columns:
-        df_close["SALSIM"] = "-"
-
-    df_close_display = df_close[
-        [
-            "INCIDENT",
-            "WITEL",
-            "SUMMARY",
-            "REPORTED DATE",
-            "SALSIM",
-            "CLOSE",
-        ]
-    ].copy()
-
-    df_close_display.index = range(1, len(df_close_display) + 1)
-
-    st.dataframe(df_close_display, use_container_width=True)
+    st.dataframe(df_close, use_container_width=True)
 
 # ============================================================
 # ======================= DOWNLOAD ===========================
