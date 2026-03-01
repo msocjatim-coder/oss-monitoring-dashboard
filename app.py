@@ -235,19 +235,58 @@ with tab1:
 
     st.dataframe(styled_df, use_container_width=True)
 
-    # ===== AUTO COPY BUTTONS =====
+    # ============================================================
+    # ======================= TOMBOL TANYA =======================
+    # ============================================================
+
+    if "selected_message" not in st.session_state:
+        st.session_state.selected_message = None
+
     for i, row in df_display.iterrows():
 
-        copy_text = f"mohon dibantu kembali info progres saat ini 🙏\nupdate terakhir : {row['WORKLOG SUMMARY']}"
+        col_left, col_right = st.columns([9, 1])
 
-        button_id = str(uuid.uuid4()).replace("-", "")
+        with col_right:
+            if st.button("Tanya", key=f"tanya_{i}"):
+
+                message = (
+                    "mohon dibantu kembali info progres saat ini 🙏\n"
+                    f"update terakhir : {row['WORKLOG SUMMARY']}"
+                )
+
+                st.session_state.selected_message = message
+
+    # ============================================================
+    # ======================= BOX PESAN ==========================
+    # ============================================================
+
+    if st.session_state.selected_message:
+
+        st.markdown("### 📑 Pesan Siap Dikirim")
 
         st.markdown(f"""
-        <button class="copy-button"
-        onclick="navigator.clipboard.writeText(`{copy_text}`)">
-        Copy 📑 Baris {i}
-        </button>
+        <div style="
+            border:2px solid #2196F3;
+            padding:15px;
+            border-radius:8px;
+            background-color:#f0f8ff;
+            margin-bottom:15px;
+            white-space:pre-wrap;
+            font-size:14px;">
+            {st.session_state.selected_message}
+        </div>
         """, unsafe_allow_html=True)
+
+        col_copy, col_close = st.columns([1,1])
+
+        with col_copy:
+            if st.button("Copy"):
+                st.code(st.session_state.selected_message)
+                st.session_state.selected_message = None
+
+        with col_close:
+            if st.button("Tutup"):
+                st.session_state.selected_message = None
 
 # ============================================================
 # ======================= TIKET CLOSE ========================
