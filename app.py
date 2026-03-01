@@ -18,9 +18,6 @@ wib = ZoneInfo("Asia/Jakarta")
 if "selected_message" not in st.session_state:
     st.session_state.selected_message = None
 
-if "stored_df" not in st.session_state:
-    st.session_state.stored_df = None
-
 # ============================================================
 # ======================= CUSTOM CSS =========================
 # ============================================================
@@ -44,24 +41,19 @@ st.markdown("""
     align-items: center;
 }
 
-/* === Table Border Style === */
-.row-style {
-    border-bottom: 1px solid #444;
-    padding-top: 6px;
-    padding-bottom: 6px;
-}
-
+/* === FULL GRID BOX TABLE === */
 .header-style {
-    border-bottom: 2px solid white;
+    border: 1px solid #666;
+    padding: 8px;
     font-weight: bold;
-    padding-top: 8px;
-    padding-bottom: 8px;
+    text-align: center;
+    background-color: #1f1f1f;
+    color: white;
 }
 
-[data-testid="column"] {
-    border-right: 1px solid #444;
-    padding-left: 6px;
-    padding-right: 6px;
+.row-style {
+    border: 1px solid #666;
+    padding: 8px;
 }
 
 /* === Animasi Jam Update === */
@@ -87,6 +79,7 @@ st.markdown("""
     margin-bottom:20px;
     white-space:pre-wrap;
     font-size:15px;
+
 }
 
 </style>
@@ -142,7 +135,8 @@ if st.session_state.selected_message:
 # ======================= HANDLE UPLOAD ======================
 # ============================================================
 
-if uploaded_files:
+if uploaded_files is not None and len(uploaded_files) > 0:
+
     df_list = []
 
     for uploaded_file in uploaded_files:
@@ -159,7 +153,7 @@ if uploaded_files:
 
     df_uploaded = pd.concat(df_list, ignore_index=True)
 
-    st.session_state.stored_df = df_uploaded.copy()
+    # SIMPAN PERMANEN
     df_uploaded.to_csv(DATA_FILE, index=False)
 
     now_time = datetime.now(wib).strftime("%H:%M")
@@ -172,9 +166,7 @@ if uploaded_files:
 # ======================= LOAD DATA ==========================
 # ============================================================
 
-if st.session_state.stored_df is not None:
-    df = st.session_state.stored_df.copy()
-elif os.path.exists(DATA_FILE):
+if os.path.exists(DATA_FILE):
     df = pd.read_csv(DATA_FILE)
 else:
     st.warning("Belum ada data. Silakan upload terlebih dahulu.")
@@ -288,6 +280,7 @@ with tab1:
         ]
     ].copy()
 
+    # ===== HEADER =====
     header_cols = st.columns([0.5,1,1,1,1,1,1,1,1,2,1])
     headers = list(df_display.columns)
 
@@ -296,6 +289,7 @@ with tab1:
 
     header_cols[-1].markdown("")
 
+    # ===== ROW DATA =====
     for i, row in df_display.iterrows():
 
         cols = st.columns([0.5,1,1,1,1,1,1,1,1,2,1])
@@ -303,6 +297,7 @@ with tab1:
         for idx, value in enumerate(row):
             cols[idx].markdown(f"<div class='row-style'>{value}</div>", unsafe_allow_html=True)
 
+        # Tombol Tanya di kanan
         with cols[-1]:
             if st.button("Tanya", key=f"tanya_{i}"):
 
