@@ -79,7 +79,6 @@ st.markdown("""
     margin-bottom:20px;
     white-space:pre-wrap;
     font-size:15px;
-
 }
 
 </style>
@@ -247,6 +246,28 @@ def detect_severity(summary):
     return "-"
 
 df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
+
+# ============================================================
+# ======================= FORMAT KHUSUS =====================
+# ============================================================
+
+# Format TTR CUSTOMER: HH:MM:SS -> HH jam MM menit
+def format_ttr(ttr_value):
+    try:
+        parts = ttr_value.split(":")
+        if len(parts) >= 2:
+            return f"{int(parts[0])} jam {int(parts[1])} menit"
+        else:
+            return ttr_value
+    except:
+        return ttr_value
+
+if "TTR CUSTOMER" in df.columns:
+    df["TTR CUSTOMER"] = df["TTR CUSTOMER"].astype(str).apply(format_ttr)
+
+# Format LAST UPDATE WORKLOG: YYYY-MM-DD HH:MM:SS.sss -> HH:MM
+if "LAST UPDATE WORKLOG" in df.columns:
+    df["LAST UPDATE WORKLOG"] = pd.to_datetime(df["LAST UPDATE WORKLOG"], errors="coerce").dt.strftime("%H:%M")
 
 # ============================================================
 # ======================= MENU BAR ===========================
