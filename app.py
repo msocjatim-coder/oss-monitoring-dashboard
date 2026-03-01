@@ -17,25 +17,28 @@ wib = ZoneInfo("Asia/Jakarta")
 
 st.markdown("""
 <style>
-/* ===== FILE UPLOADER SEJARAH (Browse sejajar Drag & Drop) ===== */
-[data-testid="stFileUploader"] {
-    max-width: 260px;               /* lebar uploader */
+/* ===== FILE UPLOADER: Tombol Browse di sebelah kanan teks ===== */
+[data-testid="stFileUploader"] section {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px;
+    padding: 6px 12px 6px 12px !important;
 }
 
-[data-testid="stFileUploader"] section {
-    display: flex;                  /* pakai flexbox */
-    flex-direction: row;            /* sebaris */
-    align-items: center;            /* vertical align tengah */
-    justify-content: space-between; /* spasi antar teks dan tombol */
-    padding: 6px 12px 6px 12px;
+[data-testid="stFileUploader"] section label p {
+    margin: 0;
+    flex: 1;  /* teks Drag & Drop mengambil ruang maksimal */
 }
 
 [data-testid="stFileUploader"] div[role="button"] {
-    min-height: 55px;
+    min-height: 38px;
     border-radius: 8px;
-    margin-left: 8px;               /* jarak kiri dari teks */
+    padding: 0 12px;
     display: flex;
-    align-items: center;            /* teks tombol rata tengah vertikal */
+    align-items: center;
+    justify-content: center;
 }
 
 /* Animasi kedap-kedip */
