@@ -1,161 +1,272 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from zoneinfo import ZoneInfo
 import os
 
-# ===============================
-# CONFIG
-# ===============================
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
-DATA_PATH = "data.csv"
-TIME_PATH = "last_update.txt"
-wib = ZoneInfo("Asia/Jakarta")
+DATA_FILE = "oss_data_shared.csv"
+TIME_FILE = "last_update_time.txt"
 
-# ===============================
-# LOAD & SAVE GLOBAL DATA
-# ===============================
-def load_data():
-    if os.path.exists(DATA_PATH):
-        return pd.read_csv(DATA_PATH)
-    return None
+# ============================================================
+# ======================= CUSTOM CSS =========================
+# ============================================================
 
-def save_data(df):
-    df.to_csv(DATA_PATH, index=False)
-    with open(TIME_PATH, "w") as f:
-        f.write(datetime.now(wib).strftime("%H:%M"))
+st.markdown("""
+<style>
 
-def get_last_update():
-    if os.path.exists(TIME_PATH):
-        with open(TIME_PATH, "r") as f:
-            return f.read().strip()
-    return None
+/* Upload button jadi persegi panjang & efisien */
+[data-testid="stFileUploader"] {
+    max-width: 260px;
+}
 
-df = load_data()
-last_update_time = get_last_update()
+[data-testid="stFileUploader"] section {
+    padding: 6px 12px 6px 12px;
+}
 
-# ===============================
-# HEADER (TITLE + UPLOAD BUTTON)
-# ===============================
-col1, col2 = st.columns([6,2])
+[data-testid="stFileUploader"] div[role="button"] {
+    min-height: 55px;
+    border-radius: 8px;
+}
+
+/* Animasi kedap-kedip */
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.2; }
+    100% { opacity: 1; }
+}
+
+.blink-text {
+    animation: blink 1.2s infinite;
+    font-weight: bold;
+    color: red;
+    font-size: 16px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# ======================= HEADER =============================
+# ============================================================
+
+col1, col2 = st.columns([8, 2])
 
 with col1:
-    st.markdown("## 📊 OSS Monitoring Dashboard")
+    st.title("📊 OSS Monitoring Dashboard")
 
 with col2:
     uploaded_files = st.file_uploader(
-        "Drag and drop files here",
+        "",
         type=["csv"],
-        accept_multiple_files=True,  # ✅ FIX: multiple file support
+        accept_multiple_files=True,
         label_visibility="collapsed"
     )
 
-# ===============================
-# SAVE DATA IF UPLOADED
-# ===============================
+# ============================================================
+# ======================= HANDLE UPLOAD ======================
+# ============================================================
+
 if uploaded_files:
     df_list = []
 
-    for file in uploaded_files:
-        temp_df = pd.read_csv(file)
-        df_list.append(temp_df)
+    for uploaded_file in uploaded_files:
+        try:
+            df_temp = pd.read_csv(uploaded_file)
+        except:
+            df_temp = pd.read_csv(uploaded_file, encoding="latin1")
 
-    merged_df = pd.concat(df_list, ignore_index=True)
-    save_data(merged_df)
+        df_temp.columns = df_temp.columns.str.strip()
+        df_temp.columns = df_temp.columns.str.replace('"', '', regex=False)
+        df_temp.columns = df_temp.columns.str.replace(',', '', regex=False)
 
-    st.rerun()
+        df_list.append(df_temp)
 
-# ===============================
-# BLINKING UPDATE TEXT
-# ===============================
-last_update_time = get_last_update()
+    df = pd.concat(df_list, ignore_index=True)
+    df.to_csv(DATA_FILE, index=False)
 
-if last_update_time:
-    st.markdown(f"""
-        <style>
-        @keyframes blink {{
-            50% {{ opacity: 0; }}
-        }}
-        .blink-text {{
-            text-align:center;
-            font-weight:bold;
-            font-size:18px;
-            color:white;
-            animation: blink 1s linear infinite;
-        }}
-        </style>
-        <div class="blink-text">
-            Data Diperbarui pada {last_update_time} WIB
-        </div>
-    """, unsafe_allow_html=True)
+    now_time = datetime.now().strftime("%H:%M")
+    with open(TIME_FILE, "w") as f:
+        f.write(now_time)
 
-# ===============================
-# MENU BAR
-# ===============================
-st.markdown("""
-------------------------------------------------------
-| TIKET AKTIF | TIKET CLOSE | DOWNLOAD TIKET |
-------------------------------------------------------
-""")
+    st.success("Data berhasil diperbarui & tersimpan.")
 
-# ===============================
-# PROCESS DATA IF EXISTS
-# ===============================
-df = load_data()
+# ============================================================
+# ======================= LOAD DATA ==========================
+# ============================================================
 
-if df is not None:
+if not os.path.exists(DATA_FILE):
+    st.warning("Belum ada data. Silakan upload terlebih dahulu.")
+    st.stop()
 
-    # ===== FIX TIMEZONE ERROR =====
-    if "REPORTED DATE" in df.columns:
-        df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
-        df["REPORTED DATE"] = df["REPORTED DATE"].dt.tz_localize(None)
+df = pd.read_csv(DATA_FILE)
 
-        now_naive = datetime.now(wib).replace(tzinfo=None)
-        df["UMUR_TIKET_HARI"] = (now_naive - df["REPORTED DATE"]).dt.days
+# ============================================================
+# ======================= TAMPILKAN JAM UPDATE ===============
+# ============================================================
 
-    # ===== FINAL FIELDS =====
-    final_columns = [
-        "Incident",
-        "witel",
-        "Layanan",
-        "service id",
-        "Jenis",
-        "Severity",
-        "TTR",
-        "Customer",
-        "last update",
-        "worklog",
-        "WorkLogs summary"
-    ]
-
-    existing_columns = [col for col in final_columns if col in df.columns]
-    df_display = df[existing_columns].copy()
-
-    # ===============================
-    # COPY BUTTON COLUMN 📑
-    # ===============================
-    def generate_copy_text(summary):
-        return f"mohon dibantu kembali info progres saat ini 🙏\nupdate terakhir : {summary}"
-
-    if "WorkLogs summary" in df_display.columns:
-        df_display["📑"] = df_display["WorkLogs summary"].apply(generate_copy_text)
-    else:
-        df_display["📑"] = ""
-
-    # ===============================
-    # DISPLAY TABLE + COPY BUTTON
-    # ===============================
-    for index, row in df_display.iterrows():
-        cols = st.columns(len(existing_columns) + 1)
-
-        for i, col in enumerate(existing_columns):
-            cols[i].write(row[col])
-
-        copy_text = row["📑"]
-        if cols[-1].button("copy", key=f"copy_{index}"):
-            st.code(copy_text)
-            st.success("Teks berhasil disalin, tinggal paste ke teknisi 👍")
-
+if os.path.exists(TIME_FILE):
+    with open(TIME_FILE, "r") as f:
+        last_update = f.read().strip()
 else:
-    st.info("Silakan upload file CSV terlebih dahulu.")
+    last_update = "-"
+
+st.markdown(
+    f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown("---")
+
+# ============================================================
+# ======================= VALIDASI ===========================
+# ============================================================
+
+required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
+missing_cols = [col for col in required_columns if col not in df.columns]
+
+if missing_cols:
+    st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
+    st.stop()
+
+# ============================================================
+# ======================= PROCESSING (TIDAK DIUBAH) ==========
+# ============================================================
+
+df = df.drop_duplicates(subset=["INCIDENT"])
+
+df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
+df["UMUR_TIKET_HARI"] = (datetime.now() - df["REPORTED DATE"]).dt.days
+
+df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
+    ["closed", "resolved", "cancel"]
+)
+
+df["SUMMARY"] = df["SUMMARY"].astype(str)
+
+df["LAYANAN"] = df["SUMMARY"].apply(
+    lambda x: "TSEL" if "TSEL" in x.upper() else "OLO"
+)
+
+def detect_jenis(summary):
+    summary = summary.upper()
+    if "RADIOIP" in summary:
+        return "RADIOIP"
+    elif "TOPOLO" in summary:
+        return "TOPOLO"
+    elif "METRO" in summary:
+        return "METRO"
+    elif "CNQ" in summary:
+        return "CNQ"
+    elif "SLD" in summary:
+        return "SLD"
+    else:
+        return "-"
+
+df["JENIS_GANGGUAN"] = df["SUMMARY"].apply(detect_jenis)
+
+severity_list = ["PREMIUM", "CRITICAL", "MAJOR", "MINOR", "LOW"]
+
+def detect_severity(summary):
+    summary = summary.upper()
+    for sev in severity_list:
+        if sev in summary:
+            return sev
+    return "-"
+
+df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
+
+# ============================================================
+# ======================= MENU BAR ===========================
+# ============================================================
+
+tab1, tab2, tab3 = st.tabs(
+    ["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"]
+)
+
+# ============================================================
+# ======================= TIKET AKTIF ========================
+# ============================================================
+
+with tab1:
+
+    df_active = df[df["IS_ACTIVE"] == True].copy()
+
+    df_display = df_active[
+        [
+            "INCIDENT",
+            "WITEL",
+            "LAYANAN",
+            "SERVICE ID",
+            "JENIS_GANGGUAN",
+            "SEVERITY",
+            "TTR CUSTOMER",
+            "LAST UPDATE WORKLOG",
+            "WORKLOG SUMMARY",
+        ]
+    ].copy()
+
+    df_display.index = range(1, len(df_display) + 1)
+
+    def highlight_severity_column(val):
+        color_map = {
+            "PREMIUM": "background-color: #800000; color: white;",
+            "CRITICAL": "background-color: red; color: white;",
+            "MAJOR": "background-color: orange;",
+            "MINOR": "background-color: yellow;",
+            "LOW": "background-color: lightgreen;",
+        }
+        return color_map.get(val, "")
+
+    styled_df = df_display.style.applymap(
+        highlight_severity_column,
+        subset=["SEVERITY"]
+    )
+
+    st.dataframe(styled_df, use_container_width=True)
+
+# ============================================================
+# ======================= TIKET CLOSE ========================
+# ============================================================
+
+with tab2:
+
+    df_close = df[df["IS_ACTIVE"] == False].copy()
+
+    if "CLOSE" not in df_close.columns:
+        df_close["CLOSE"] = "-"
+
+    df_close["CLOSE"] = df_close["CLOSE"].fillna("-")
+
+    if "SALSIM" not in df_close.columns:
+        df_close["SALSIM"] = "-"
+
+    df_close_display = df_close[
+        [
+            "INCIDENT",
+            "WITEL",
+            "SUMMARY",
+            "REPORTED DATE",
+            "SALSIM",
+            "CLOSE",
+        ]
+    ].copy()
+
+    df_close_display.index = range(1, len(df_close_display) + 1)
+
+    st.dataframe(df_close_display, use_container_width=True)
+
+# ============================================================
+# ======================= DOWNLOAD ===========================
+# ============================================================
+
+with tab3:
+
+    csv_download = df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        label="Download Semua Data (CSV)",
+        data=csv_download,
+        file_name="oss_full_data.csv",
+        mime="text/csv"
+    )
