@@ -153,14 +153,24 @@ with tab1:
     df_display = df_active[["INCIDENT","WITEL","LAYANAN","SERVICE ID","JENIS_GANGGUAN","SEVERITY",
                             "TTR CUSTOMER","LAST UPDATE WORKLOG","WORKLOG SUMMARY"]].copy()
     
-    # Format TTR CUSTOMER: 47:24:41 → 47 jam 24 menit
+    # ========================== UPDATE TTR CUSTOMER ==========================
+    # Format TTR CUSTOMER menjadi X hari Y jam Z menit jika > 24 jam
     def format_ttr_customer(ttr):
-        if not isinstance(ttr, str) or not ttr: return ttr
+        if not isinstance(ttr, str) or not ttr: 
+            return ttr
         parts = ttr.split(":")
-        if len(parts) != 3: return ttr
-        jam, menit, _ = parts
-        return f"{int(jam)} jam {int(menit)} menit"
+        if len(parts) != 3:
+            return ttr
+        total_hours, minutes, _ = map(int, parts)
+        days = total_hours // 24
+        hours = total_hours % 24
+        if days > 0:
+            return f"{days} hari {hours} jam {minutes} menit"
+        else:
+            return f"{hours} jam {minutes} menit"
+
     df_display["TTR CUSTOMER"] = df_display["TTR CUSTOMER"].apply(format_ttr_customer)
+    # ==========================================================================
 
     # Format LAST UPDATE WORKLOG: 2026-03-01 08:11:49.399 → 08:11
     df_display["LAST UPDATE WORKLOG"] = pd.to_datetime(df_display["LAST UPDATE WORKLOG"], errors='coerce').dt.strftime('%H:%M')
