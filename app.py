@@ -9,8 +9,14 @@ st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 DATA_FILE = "oss_data_shared.csv"
 TIME_FILE = "last_update_time.txt"
 
-# ================= WIB TIMEZONE FIX =================
 wib = ZoneInfo("Asia/Jakarta")
+
+# ============================================================
+# ======================= SESSION STATE ======================
+# ============================================================
+
+if "selected_message" not in st.session_state:
+    st.session_state.selected_message = None
 
 # ============================================================
 # ======================= CUSTOM CSS =========================
@@ -19,21 +25,38 @@ wib = ZoneInfo("Asia/Jakarta")
 st.markdown("""
 <style>
 
-/* Upload button jadi persegi panjang & efisien */
-[data-testid="stFileUploader"] {
-    max-width: 260px;
-}
-
+/* === FILE UPLOADER FIX === */
 [data-testid="stFileUploader"] section {
-    padding: 6px 12px 6px 12px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 8px 12px;
 }
 
 [data-testid="stFileUploader"] div[role="button"] {
-    min-height: 55px;
-    border-radius: 8px;
+    margin-left: 10px;
+    height: 38px;
+    display: flex;
+    align-items: center;
 }
 
-/* Animasi kedap-kedip */
+/* === FULL GRID BOX TABLE === */
+.header-style {
+    border: 1px solid #666;
+    padding: 8px;
+    font-weight: bold;
+    text-align: center;
+    background-color: #1f1f1f;
+    color: white;
+}
+
+.row-style {
+    border: 1px solid #666;
+    padding: 8px;
+}
+
+/* === Animasi Jam Update === */
 @keyframes blink {
     0% { opacity: 1; }
     50% { opacity: 0.2; }
@@ -43,9 +66,20 @@ st.markdown("""
 .blink-text {
     animation: blink 1.2s infinite;
     font-weight: bold;
-    color: white;   /* ✅ SEKARANG PUTIH */
+    color: white;
     font-size: 16px;
     text-align: center;
+}
+
+.popup-box {
+    border:2px solid #2196F3;
+    padding:20px;
+    border-radius:10px;
+    background-color:#f0f8ff;
+    margin-bottom:20px;
+    white-space:pre-wrap;
+    font-size:15px;
+
 }
 
 </style>
@@ -61,18 +95,48 @@ with col1:
     st.title("📊 OSS Monitoring Dashboard")
 
 with col2:
-    uploaded_files = st.file_uploader(
-        "",
-        type=["csv"],
-        accept_multiple_files=True,
-        label_visibility="collapsed"
+    if st.session_state.selected_message is None:
+        uploaded_files = st.file_uploader(
+            "",
+            type=["csv"],
+            accept_multiple_files=True,
+            label_visibility="collapsed"
+        )
+    else:
+        uploaded_files = None
+
+# ============================================================
+# ======================= POPUP AREA =========================
+# ============================================================
+
+if st.session_state.selected_message:
+
+    st.markdown("### 📑 Pesan Siap Dikirim")
+
+    st.markdown(
+        f'<div class="popup-box">{st.session_state.selected_message}</div>',
+        unsafe_allow_html=True
     )
+
+    col_copy, col_close = st.columns([1,1])
+
+    with col_copy:
+        if st.button("Copy Pesan"):
+            st.code(st.session_state.selected_message)
+            st.session_state.selected_message = None
+            st.rerun()
+
+    with col_close:
+        if st.button("Tutup"):
+            st.session_state.selected_message = None
+            st.rerun()
 
 # ============================================================
 # ======================= HANDLE UPLOAD ======================
 # ============================================================
 
-if uploaded_files:
+if uploaded_files is not None and len(uploaded_files) > 0:
+
     df_list = []
 
     for uploaded_file in uploaded_files:
@@ -87,12 +151,12 @@ if uploaded_files:
 
         df_list.append(df_temp)
 
-    df = pd.concat(df_list, ignore_index=True)
-    df.to_csv(DATA_FILE, index=False)
+    df_uploaded = pd.concat(df_list, ignore_index=True)
 
-    # ✅ FIX WIB TIME
+    # SIMPAN PERMANEN
+    df_uploaded.to_csv(DATA_FILE, index=False)
+
     now_time = datetime.now(wib).strftime("%H:%M")
-
     with open(TIME_FILE, "w") as f:
         f.write(now_time)
 
@@ -102,21 +166,20 @@ if uploaded_files:
 # ======================= LOAD DATA ==========================
 # ============================================================
 
-if not os.path.exists(DATA_FILE):
+if os.path.exists(DATA_FILE):
+    df = pd.read_csv(DATA_FILE)
+else:
     st.warning("Belum ada data. Silakan upload terlebih dahulu.")
     st.stop()
 
-df = pd.read_csv(DATA_FILE)
-
 # ============================================================
-# ======================= TAMPILKAN JAM UPDATE ===============
+# ======================= JAM UPDATE =========================
 # ============================================================
 
 if os.path.exists(TIME_FILE):
     with open(TIME_FILE, "r") as f:
         last_update = f.read().strip()
 
-    # hanya tampil jika ada isi valid
     if last_update:
         st.markdown(
             f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>',
@@ -137,17 +200,14 @@ if missing_cols:
     st.stop()
 
 # ============================================================
-# ======================= PROCESSING (TIDAK DIUBAH) ==========
+# ======================= PROCESSING =========================
 # ============================================================
 
 df = df.drop_duplicates(subset=["INCIDENT"])
 
 df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
-
-# ✅ FIX error datetime conflict
 df["REPORTED DATE"] = df["REPORTED DATE"].dt.tz_localize(None)
 now_naive = datetime.now(wib).replace(tzinfo=None)
-
 df["UMUR_TIKET_HARI"] = (now_naive - df["REPORTED DATE"]).dt.days
 
 df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
@@ -203,9 +263,11 @@ tab1, tab2, tab3 = st.tabs(
 with tab1:
 
     df_active = df[df["IS_ACTIVE"] == True].copy()
+    df_active.insert(0, "NO", range(1, len(df_active) + 1))
 
     df_display = df_active[
         [
+            "NO",
             "INCIDENT",
             "WITEL",
             "LAYANAN",
@@ -218,24 +280,34 @@ with tab1:
         ]
     ].copy()
 
-    df_display.index = range(1, len(df_display) + 1)
+    # ===== HEADER =====
+    header_cols = st.columns([0.5,1,1,1,1,1,1,1,1,2,1])
+    headers = list(df_display.columns)
 
-    def highlight_severity_column(val):
-        color_map = {
-            "PREMIUM": "background-color: #800000; color: white;",
-            "CRITICAL": "background-color: red; color: white;",
-            "MAJOR": "background-color: orange;",
-            "MINOR": "background-color: yellow;",
-            "LOW": "background-color: lightgreen;",
-        }
-        return color_map.get(val, "")
+    for col, header in zip(header_cols[:-1], headers):
+        col.markdown(f"<div class='header-style'>{header}</div>", unsafe_allow_html=True)
 
-    styled_df = df_display.style.applymap(
-        highlight_severity_column,
-        subset=["SEVERITY"]
-    )
+    header_cols[-1].markdown("")
 
-    st.dataframe(styled_df, use_container_width=True)
+    # ===== ROW DATA =====
+    for i, row in df_display.iterrows():
+
+        cols = st.columns([0.5,1,1,1,1,1,1,1,1,2,1])
+
+        for idx, value in enumerate(row):
+            cols[idx].markdown(f"<div class='row-style'>{value}</div>", unsafe_allow_html=True)
+
+        # Tombol Tanya di kanan
+        with cols[-1]:
+            if st.button("Tanya", key=f"tanya_{i}"):
+
+                message = (
+                    "mohon dibantu kembali info progres saat ini 🙏\n"
+                    f"update terakhir : {row['WORKLOG SUMMARY']}"
+                )
+
+                st.session_state.selected_message = message
+                st.rerun()
 
 # ============================================================
 # ======================= TIKET CLOSE ========================
@@ -266,7 +338,31 @@ with tab2:
 
     df_close_display.index = range(1, len(df_close_display) + 1)
 
-    st.dataframe(df_close_display, use_container_width=True)
+    # Styling untuk border kotak penuh pada tabel close
+    def style_table_border(df):
+        return df.style.set_table_styles(
+            [
+                {'selector': 'th, td',
+                 'props': [
+                    ('border', '1px solid #666'),
+                    ('padding', '8px'),
+                    ('text-align', 'left')
+                 ]},
+                {'selector': 'thead th',
+                 'props': [
+                    ('background-color', '#1f1f1f'),
+                    ('color', 'white'),
+                    ('font-weight', 'bold'),
+                    ('text-align', 'center')
+                 ]},
+                {'selector': 'tbody tr:hover',
+                 'props': [
+                    ('background-color', '#333')
+                 ]}
+            ]
+        ).set_properties(**{'border-collapse': 'collapse'})
+
+    st.dataframe(style_table_border(df_close_display), use_container_width=True)
 
 # ============================================================
 # ======================= DOWNLOAD ===========================
