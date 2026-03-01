@@ -25,19 +25,23 @@ if "selected_message" not in st.session_state:
 st.markdown("""
 <style>
 
-[data-testid="stFileUploader"] {
-    max-width: 260px;
-}
-
+/* === FILE UPLOADER FIX: browse sejajar drag text === */
 [data-testid="stFileUploader"] section {
-    padding: 6px 12px 6px 12px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 8px 12px;
 }
 
 [data-testid="stFileUploader"] div[role="button"] {
-    min-height: 55px;
-    border-radius: 8px;
+    margin-left: 10px;
+    height: 38px;
+    display: flex;
+    align-items: center;
 }
 
+/* === Animasi Jam Update === */
 @keyframes blink {
     0% { opacity: 1; }
     50% { opacity: 0.2; }
@@ -256,18 +260,22 @@ with tab1:
         ]
     ].copy()
 
-    df_display["TANYA"] = ""  # kolom baru
-
     df_display.index = range(1, len(df_display) + 1)
 
-    st.dataframe(df_display, use_container_width=True)
+    header_cols = st.columns([1,1,1,1,1,1,1,1,2,1])
+    headers = list(df_display.columns) + ["TANYA"]
 
-    # tombol sesuai kolom TANYA
+    for col, header in zip(header_cols, headers):
+        col.markdown(f"**{header}**")
+
     for i, row in df_display.iterrows():
 
-        col_spacer, col_button = st.columns([9,1])
+        cols = st.columns([1,1,1,1,1,1,1,1,2,1])
 
-        with col_button:
+        for idx, value in enumerate(row):
+            cols[idx].write(value)
+
+        with cols[-1]:
             if st.button("Tanya", key=f"tanya_{i}"):
 
                 message = (
