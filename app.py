@@ -13,6 +13,13 @@ TIME_FILE = "last_update_time.txt"
 wib = ZoneInfo("Asia/Jakarta")
 
 # ============================================================
+# ======================= SESSION STATE ======================
+# ============================================================
+
+if "selected_message" not in st.session_state:
+    st.session_state.selected_message = None
+
+# ============================================================
 # ======================= CUSTOM CSS =========================
 # ============================================================
 
@@ -46,18 +53,14 @@ st.markdown("""
     text-align: center;
 }
 
-.copy-button {
-    background-color: #2196F3;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.copy-button:hover {
-    background-color: #0b7dda;
+.popup-box {
+    border:2px solid #2196F3;
+    padding:20px;
+    border-radius:10px;
+    background-color:#f0f8ff;
+    margin-bottom:20px;
+    white-space:pre-wrap;
+    font-size:15px;
 }
 
 </style>
@@ -73,12 +76,42 @@ with col1:
     st.title("📊 OSS Monitoring Dashboard")
 
 with col2:
-    uploaded_files = st.file_uploader(
-        "",
-        type=["csv"],
-        accept_multiple_files=True,
-        label_visibility="collapsed"
+    # Upload hanya muncul jika tidak ada popup aktif
+    if st.session_state.selected_message is None:
+        uploaded_files = st.file_uploader(
+            "",
+            type=["csv"],
+            accept_multiple_files=True,
+            label_visibility="collapsed"
+        )
+    else:
+        uploaded_files = None
+
+# ============================================================
+# ======================= POPUP AREA =========================
+# ============================================================
+
+if st.session_state.selected_message:
+
+    st.markdown("### 📑 Pesan Siap Dikirim")
+
+    st.markdown(
+        f'<div class="popup-box">{st.session_state.selected_message}</div>',
+        unsafe_allow_html=True
     )
+
+    col_copy, col_close = st.columns([1,1])
+
+    with col_copy:
+        if st.button("Copy Pesan"):
+            st.code(st.session_state.selected_message)
+            st.session_state.selected_message = None
+            st.rerun()
+
+    with col_close:
+        if st.button("Tutup"):
+            st.session_state.selected_message = None
+            st.rerun()
 
 # ============================================================
 # ======================= HANDLE UPLOAD ======================
@@ -225,28 +258,19 @@ with tab1:
         ]
     ].copy()
 
-    df_display["📑"] = ""
-
     df_display.index = range(1, len(df_display) + 1)
 
-    styled_df = df_display.style.set_properties(**{
-        "border": "1px solid #444"
-    })
+    st.dataframe(df_display, use_container_width=True)
 
-    st.dataframe(styled_df, use_container_width=True)
-
-    # ============================================================
-    # ======================= TOMBOL TANYA =======================
-    # ============================================================
-
-    if "selected_message" not in st.session_state:
-        st.session_state.selected_message = None
+    st.markdown("### 📑 Aksi")
 
     for i, row in df_display.iterrows():
+        col_label, col_button = st.columns([8,2])
 
-        col_left, col_right = st.columns([9, 1])
+        with col_label:
+            st.write(f"Baris {i}")
 
-        with col_right:
+        with col_button:
             if st.button("Tanya", key=f"tanya_{i}"):
 
                 message = (
@@ -255,38 +279,7 @@ with tab1:
                 )
 
                 st.session_state.selected_message = message
-
-    # ============================================================
-    # ======================= BOX PESAN ==========================
-    # ============================================================
-
-    if st.session_state.selected_message:
-
-        st.markdown("### 📑 Pesan Siap Dikirim")
-
-        st.markdown(f"""
-        <div style="
-            border:2px solid #2196F3;
-            padding:15px;
-            border-radius:8px;
-            background-color:#f0f8ff;
-            margin-bottom:15px;
-            white-space:pre-wrap;
-            font-size:14px;">
-            {st.session_state.selected_message}
-        </div>
-        """, unsafe_allow_html=True)
-
-        col_copy, col_close = st.columns([1,1])
-
-        with col_copy:
-            if st.button("Copy"):
-                st.code(st.session_state.selected_message)
-                st.session_state.selected_message = None
-
-        with col_close:
-            if st.button("Tutup"):
-                st.session_state.selected_message = None
+                st.rerun()
 
 # ============================================================
 # ======================= TIKET CLOSE ========================
