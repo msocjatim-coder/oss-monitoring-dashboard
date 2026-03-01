@@ -6,51 +6,122 @@ import os
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
 DATA_FILE = "oss_data_shared.csv"
+TIME_FILE = "last_update_time.txt"
 
-st.title("📊 OSS Monitoring Dashboard")
+# ============================================================
+# ======================= CUSTOM CSS =========================
+# ============================================================
 
-# ================= MENU BAR =================
-tab1, tab2, tab3 = st.tabs(
-    ["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"]
-)
+st.markdown("""
+<style>
 
-# ================= UPLOAD (HANYA SEKALI) =================
-with st.expander("Upload Semua File CSV dari OSS (Upload jika ada update data)"):
+/* Upload button jadi persegi panjang & efisien */
+[data-testid="stFileUploader"] {
+    max-width: 260px;
+}
+
+[data-testid="stFileUploader"] section {
+    padding: 6px 12px 6px 12px;
+}
+
+[data-testid="stFileUploader"] div[role="button"] {
+    min-height: 55px;
+    border-radius: 8px;
+}
+
+/* Animasi kedap-kedip */
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.2; }
+    100% { opacity: 1; }
+}
+
+.blink-text {
+    animation: blink 1.2s infinite;
+    font-weight: bold;
+    color: red;
+    font-size: 16px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# ======================= HEADER =============================
+# ============================================================
+
+col1, col2 = st.columns([8, 2])
+
+with col1:
+    st.title("📊 OSS Monitoring Dashboard")
+
+with col2:
     uploaded_files = st.file_uploader(
-        "Upload CSV (Bisa banyak sekaligus)",
+        "",
         type=["csv"],
-        accept_multiple_files=True
+        accept_multiple_files=True,
+        label_visibility="collapsed"
     )
 
-    if uploaded_files:
-        df_list = []
+# ============================================================
+# ======================= HANDLE UPLOAD ======================
+# ============================================================
 
-        for uploaded_file in uploaded_files:
-            try:
-                df_temp = pd.read_csv(uploaded_file)
-            except:
-                df_temp = pd.read_csv(uploaded_file, encoding="latin1")
+if uploaded_files:
+    df_list = []
 
-            df_temp.columns = df_temp.columns.str.strip()
-            df_temp.columns = df_temp.columns.str.replace('"', '', regex=False)
-            df_temp.columns = df_temp.columns.str.replace(',', '', regex=False)
+    for uploaded_file in uploaded_files:
+        try:
+            df_temp = pd.read_csv(uploaded_file)
+        except:
+            df_temp = pd.read_csv(uploaded_file, encoding="latin1")
 
-            df_list.append(df_temp)
+        df_temp.columns = df_temp.columns.str.strip()
+        df_temp.columns = df_temp.columns.str.replace('"', '', regex=False)
+        df_temp.columns = df_temp.columns.str.replace(',', '', regex=False)
 
-        df = pd.concat(df_list, ignore_index=True)
+        df_list.append(df_temp)
 
-        df.to_csv(DATA_FILE, index=False)
+    df = pd.concat(df_list, ignore_index=True)
+    df.to_csv(DATA_FILE, index=False)
 
-        st.success("Data berhasil disimpan & dapat diakses semua user.")
+    now_time = datetime.now().strftime("%H:%M")
+    with open(TIME_FILE, "w") as f:
+        f.write(now_time)
 
-# ================= LOAD DATA UNTUK SEMUA USER =================
+    st.success("Data berhasil diperbarui & tersimpan.")
+
+# ============================================================
+# ======================= LOAD DATA ==========================
+# ============================================================
+
 if not os.path.exists(DATA_FILE):
     st.warning("Belum ada data. Silakan upload terlebih dahulu.")
     st.stop()
 
 df = pd.read_csv(DATA_FILE)
 
-# ================= VALIDASI KOLOM DASAR =================
+# ============================================================
+# ======================= TAMPILKAN JAM UPDATE ===============
+# ============================================================
+
+if os.path.exists(TIME_FILE):
+    with open(TIME_FILE, "r") as f:
+        last_update = f.read().strip()
+else:
+    last_update = "-"
+
+st.markdown(
+    f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown("---")
+
+# ============================================================
+# ======================= VALIDASI ===========================
+# ============================================================
+
 required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
 missing_cols = [col for col in required_columns if col not in df.columns]
 
@@ -58,7 +129,10 @@ if missing_cols:
     st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     st.stop()
 
-# ================= PROCESSING (TIDAK DIUBAH) =================
+# ============================================================
+# ======================= PROCESSING (TIDAK DIUBAH) ==========
+# ============================================================
+
 df = df.drop_duplicates(subset=["INCIDENT"])
 
 df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
@@ -102,32 +176,19 @@ def detect_severity(summary):
 
 df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
-# ================= FORMAT TAMBAHAN =================
+# ============================================================
+# ======================= MENU BAR ===========================
+# ============================================================
 
-if "TTR CUSTOMER" in df.columns:
-    def format_ttr(ttr_value):
-        try:
-            time_obj = pd.to_datetime(ttr_value, format="%H:%M:%S")
-            hours = time_obj.hour
-            minutes = time_obj.minute
-            return f"{hours} jam {minutes} menit"
-        except:
-            return ttr_value
-
-    df["TTR CUSTOMER"] = df["TTR CUSTOMER"].apply(format_ttr)
-
-if "LAST UPDATE WORKLOG" in df.columns:
-    df["LAST UPDATE WORKLOG"] = pd.to_datetime(
-        df["LAST UPDATE WORKLOG"], errors="coerce"
-    ).dt.strftime("%H:%M:%S")
+tab1, tab2, tab3 = st.tabs(
+    ["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"]
+)
 
 # ============================================================
-# ===================== TAB 1 : TIKET AKTIF ==================
+# ======================= TIKET AKTIF ========================
 # ============================================================
 
 with tab1:
-
-    st.subheader("📋 Data Monitoring Tiket Aktif")
 
     df_active = df[df["IS_ACTIVE"] == True].copy()
 
@@ -165,22 +226,18 @@ with tab1:
     st.dataframe(styled_df, use_container_width=True)
 
 # ============================================================
-# ===================== TAB 2 : TIKET CLOSE ==================
+# ======================= TIKET CLOSE ========================
 # ============================================================
 
 with tab2:
 
-    st.subheader("📁 Data Tiket Close")
-
     df_close = df[df["IS_ACTIVE"] == False].copy()
 
-    # Pastikan kolom CLOSE ada
     if "CLOSE" not in df_close.columns:
         df_close["CLOSE"] = "-"
 
     df_close["CLOSE"] = df_close["CLOSE"].fillna("-")
 
-    # Jika kolom SALSIM tidak ada
     if "SALSIM" not in df_close.columns:
         df_close["SALSIM"] = "-"
 
@@ -200,12 +257,10 @@ with tab2:
     st.dataframe(df_close_display, use_container_width=True)
 
 # ============================================================
-# ===================== TAB 3 : DOWNLOAD =====================
+# ======================= DOWNLOAD ===========================
 # ============================================================
 
 with tab3:
-
-    st.subheader("⬇ Download Semua Data")
 
     csv_download = df.to_csv(index=False).encode("utf-8")
 
