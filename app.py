@@ -44,22 +44,30 @@ with col1:
     st.markdown("## 📊 OSS Monitoring Dashboard")
 
 with col2:
-    uploaded_file = st.file_uploader(
+    uploaded_files = st.file_uploader(
         "Drag and drop files here",
         type=["csv"],
+        accept_multiple_files=True,  # ✅ FIX: multiple file support
         label_visibility="collapsed"
     )
 
 # ===============================
 # SAVE DATA IF UPLOADED
 # ===============================
-if uploaded_file is not None:
-    df_new = pd.read_csv(uploaded_file)
-    save_data(df_new)
+if uploaded_files:
+    df_list = []
+
+    for file in uploaded_files:
+        temp_df = pd.read_csv(file)
+        df_list.append(temp_df)
+
+    merged_df = pd.concat(df_list, ignore_index=True)
+    save_data(merged_df)
+
     st.rerun()
 
 # ===============================
-# BLINKING UPDATE TEXT (ONLY IF EXIST)
+# BLINKING UPDATE TEXT
 # ===============================
 last_update_time = get_last_update()
 
@@ -130,7 +138,10 @@ if df is not None:
     def generate_copy_text(summary):
         return f"mohon dibantu kembali info progres saat ini 🙏\nupdate terakhir : {summary}"
 
-    df_display["📑"] = df_display["WorkLogs summary"].apply(generate_copy_text)
+    if "WorkLogs summary" in df_display.columns:
+        df_display["📑"] = df_display["WorkLogs summary"].apply(generate_copy_text)
+    else:
+        df_display["📑"] = ""
 
     # ===============================
     # DISPLAY TABLE + COPY BUTTON
