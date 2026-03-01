@@ -43,9 +43,23 @@ st.markdown("""
 .blink-text {
     animation: blink 1.2s infinite;
     font-weight: bold;
-    color: white;   /* ✅ SEKARANG PUTIH */
+    color: white;
     font-size: 16px;
     text-align: center;
+}
+
+.copy-btn {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.copy-btn:hover {
+    background-color: #45a049;
 }
 
 </style>
@@ -90,7 +104,6 @@ if uploaded_files:
     df = pd.concat(df_list, ignore_index=True)
     df.to_csv(DATA_FILE, index=False)
 
-    # ✅ FIX WIB TIME
     now_time = datetime.now(wib).strftime("%H:%M")
 
     with open(TIME_FILE, "w") as f:
@@ -116,7 +129,6 @@ if os.path.exists(TIME_FILE):
     with open(TIME_FILE, "r") as f:
         last_update = f.read().strip()
 
-    # hanya tampil jika ada isi valid
     if last_update:
         st.markdown(
             f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>',
@@ -143,11 +155,8 @@ if missing_cols:
 df = df.drop_duplicates(subset=["INCIDENT"])
 
 df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce")
-
-# ✅ FIX error datetime conflict
 df["REPORTED DATE"] = df["REPORTED DATE"].dt.tz_localize(None)
 now_naive = datetime.now(wib).replace(tzinfo=None)
-
 df["UMUR_TIKET_HARI"] = (now_naive - df["REPORTED DATE"]).dt.days
 
 df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
@@ -220,22 +229,21 @@ with tab1:
 
     df_display.index = range(1, len(df_display) + 1)
 
-    def highlight_severity_column(val):
-        color_map = {
-            "PREMIUM": "background-color: #800000; color: white;",
-            "CRITICAL": "background-color: red; color: white;",
-            "MAJOR": "background-color: orange;",
-            "MINOR": "background-color: yellow;",
-            "LOW": "background-color: lightgreen;",
-        }
-        return color_map.get(val, "")
+    st.markdown("### TIKET AKTIF")
 
-    styled_df = df_display.style.applymap(
-        highlight_severity_column,
-        subset=["SEVERITY"]
-    )
+    for i, row in df_display.iterrows():
 
-    st.dataframe(styled_df, use_container_width=True)
+        cols = st.columns(len(df_display.columns) + 1)
+
+        for idx, col in enumerate(df_display.columns):
+            cols[idx].write(row[col])
+
+        copy_text = f"""mohon dibantu kembali info progres saat ini 🙏
+update terakhir : {row["WORKLOG SUMMARY"]}"""
+
+        if cols[-1].button("copy", key=f"copy_{i}"):
+            st.code(copy_text)
+            st.success("Teks siap di-copy dan paste ke teknisi 👍")
 
 # ============================================================
 # ======================= TIKET CLOSE ========================
