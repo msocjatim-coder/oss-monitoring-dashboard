@@ -11,18 +11,42 @@ TIME_FILE = "last_update_time.txt"
 
 wib = ZoneInfo("Asia/Jakarta")
 
+# ============================================================
+# ======================= CUSTOM CSS =========================
+# ============================================================
+
 st.markdown("""
 <style>
-/* Upload button jadi persegi panjang & efisien */
-[data-testid="stFileUploader"] { max-width: 260px; }
-[data-testid="stFileUploader"] section { padding: 6px 12px 6px 12px; }
-[data-testid="stFileUploader"] div[role="button"] { min-height: 55px; border-radius: 8px; }
+/* ===== FILE UPLOADER SEJARAH (Browse sejajar Drag & Drop) ===== */
+[data-testid="stFileUploader"] {
+    max-width: 260px;               /* lebar uploader */
+}
+
+[data-testid="stFileUploader"] section {
+    display: flex;                  /* pakai flexbox */
+    flex-direction: row;            /* sebaris */
+    align-items: center;            /* vertical align tengah */
+    justify-content: space-between; /* spasi antar teks dan tombol */
+    padding: 6px 12px 6px 12px;
+}
+
+[data-testid="stFileUploader"] div[role="button"] {
+    min-height: 55px;
+    border-radius: 8px;
+    margin-left: 8px;               /* jarak kiri dari teks */
+    display: flex;
+    align-items: center;            /* teks tombol rata tengah vertikal */
+}
 
 /* Animasi kedap-kedip */
 @keyframes blink {0% { opacity: 1; }50% { opacity: 0.2; }100% { opacity: 1; }}
-.blink-text { animation: blink 1.2s infinite; font-weight: bold; color: white; font-size: 16px; text-align: center;}
+.blink-text { animation: blink 1.2s infinite; font-weight: bold; color: white; font-size: 16px; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
+
+# ============================================================
+# ======================= HEADER =============================
+# ============================================================
 
 col1, col2 = st.columns([8, 2])
 with col1:
@@ -30,33 +54,60 @@ with col1:
 with col2:
     uploaded_files = st.file_uploader("", type=["csv"], accept_multiple_files=True, label_visibility="collapsed")
 
+# ============================================================
+# ======================= HANDLE UPLOAD ======================
+# ============================================================
+
 if uploaded_files:
     df_list = []
     for uploaded_file in uploaded_files:
-        try: df_temp = pd.read_csv(uploaded_file)
-        except: df_temp = pd.read_csv(uploaded_file, encoding="latin1")
+        try:
+            df_temp = pd.read_csv(uploaded_file)
+        except:
+            df_temp = pd.read_csv(uploaded_file, encoding="latin1")
         df_temp.columns = df_temp.columns.str.strip().str.replace('"', '', regex=False).str.replace(',', '', regex=False)
         df_list.append(df_temp)
     df = pd.concat(df_list, ignore_index=True)
     df.to_csv(DATA_FILE, index=False)
     now_time = datetime.now(wib).strftime("%H:%M")
-    with open(TIME_FILE, "w") as f: f.write(now_time)
+    with open(TIME_FILE, "w") as f:
+        f.write(now_time)
     st.success("Data berhasil diperbarui & tersimpan.")
+
+# ============================================================
+# ======================= LOAD DATA ==========================
+# ============================================================
 
 if not os.path.exists(DATA_FILE):
     st.warning("Belum ada data. Silakan upload terlebih dahulu.")
     st.stop()
 df = pd.read_csv(DATA_FILE)
 
+# ============================================================
+# ======================= JAM UPDATE =========================
+# ============================================================
+
 if os.path.exists(TIME_FILE):
-    with open(TIME_FILE, "r") as f: last_update = f.read().strip()
-    if last_update: st.markdown(f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>', unsafe_allow_html=True)
+    with open(TIME_FILE, "r") as f:
+        last_update = f.read().strip()
+    if last_update:
+        st.markdown(f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>', unsafe_allow_html=True)
 
 st.markdown("---")
 
+# ============================================================
+# ======================= VALIDASI ===========================
+# ============================================================
+
 required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
 missing_cols = [col for col in required_columns if col not in df.columns]
-if missing_cols: st.error(f"Kolom berikut tidak ditemukan: {missing_cols}"); st.stop()
+if missing_cols:
+    st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
+    st.stop()
+
+# ============================================================
+# ======================= PROCESSING =========================
+# ============================================================
 
 df = df.drop_duplicates(subset=["INCIDENT"])
 df["REPORTED DATE"] = pd.to_datetime(df["REPORTED DATE"], errors="coerce").dt.tz_localize(None)
@@ -84,13 +135,21 @@ def detect_severity(summary):
     return "-"
 df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
 
+# ============================================================
+# ======================= MENU BAR ===========================
+# ============================================================
+
 tab1, tab2, tab3 = st.tabs(["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"])
+
+# ============================================================
+# ======================= TIKET AKTIF ========================
+# ============================================================
 
 with tab1:
     df_active = df[df["IS_ACTIVE"] == True].copy()
-    df_display = df_active[
-        ["INCIDENT","WITEL","LAYANAN","SERVICE ID","JENIS_GANGGUAN","SEVERITY","TTR CUSTOMER","LAST UPDATE WORKLOG","WORKLOG SUMMARY"]
-    ].copy()
+    df_display = df_active[["INCIDENT","WITEL","LAYANAN","SERVICE ID","JENIS_GANGGUAN","SEVERITY",
+                            "TTR CUSTOMER","LAST UPDATE WORKLOG","WORKLOG SUMMARY"]].copy()
+    
     # Format TTR CUSTOMER: 47:24:41 → 47 jam 24 menit
     def format_ttr_customer(ttr):
         if not isinstance(ttr, str) or not ttr: return ttr
@@ -99,15 +158,26 @@ with tab1:
         jam, menit, _ = parts
         return f"{int(jam)} jam {int(menit)} menit"
     df_display["TTR CUSTOMER"] = df_display["TTR CUSTOMER"].apply(format_ttr_customer)
+
     # Format LAST UPDATE WORKLOG: 2026-03-01 08:11:49.399 → 08:11
     df_display["LAST UPDATE WORKLOG"] = pd.to_datetime(df_display["LAST UPDATE WORKLOG"], errors='coerce').dt.strftime('%H:%M')
+
     df_display.index = range(1, len(df_display)+1)
+
     def highlight_severity_column(val):
-        color_map = {"PREMIUM":"background-color:#800000;color:white;","CRITICAL":"background-color:red;color:white;",
-                     "MAJOR":"background-color:orange;","MINOR":"background-color:yellow;","LOW":"background-color:lightgreen;"}
+        color_map = {"PREMIUM":"background-color:#800000;color:white;",
+                     "CRITICAL":"background-color:red;color:white;",
+                     "MAJOR":"background-color:orange;",
+                     "MINOR":"background-color:yellow;",
+                     "LOW":"background-color:lightgreen;"}
         return color_map.get(val,"")
+
     styled_df = df_display.style.applymap(highlight_severity_column, subset=["SEVERITY"])
     st.dataframe(styled_df, use_container_width=True)
+
+# ============================================================
+# ======================= TIKET CLOSE ========================
+# ============================================================
 
 with tab2:
     df_close = df[df["IS_ACTIVE"] == False].copy()
@@ -117,6 +187,10 @@ with tab2:
     df_close_display = df_close[["INCIDENT","WITEL","SUMMARY","REPORTED DATE","SALSIM","CLOSE"]].copy()
     df_close_display.index = range(1, len(df_close_display)+1)
     st.dataframe(df_close_display, use_container_width=True)
+
+# ============================================================
+# ======================= DOWNLOAD ===========================
+# ============================================================
 
 with tab3:
     csv_download = df.to_csv(index=False).encode("utf-8")
