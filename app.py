@@ -154,6 +154,7 @@ with tab1:
                             "TTR CUSTOMER","LAST UPDATE WORKLOG","WORKLOG SUMMARY"]].copy()
     
     # ========================== UPDATE TTR CUSTOMER ==========================
+    # Format TTR CUSTOMER menjadi X hari Y jam Z menit jika > 24 jam
     def format_ttr_customer(ttr):
         if not isinstance(ttr, str) or not ttr: 
             return ttr
@@ -167,15 +168,15 @@ with tab1:
             return f"{days} hari {hours} jam {minutes} menit"
         else:
             return f"{hours} jam {minutes} menit"
+
     df_display["TTR CUSTOMER"] = df_display["TTR CUSTOMER"].apply(format_ttr_customer)
     # ==========================================================================
 
-    # Format LAST UPDATE WORKLOG
+    # Format LAST UPDATE WORKLOG: 2026-03-01 08:11:49.399 → 08:11
     df_display["LAST UPDATE WORKLOG"] = pd.to_datetime(df_display["LAST UPDATE WORKLOG"], errors='coerce').dt.strftime('%H:%M')
-    
+
     df_display.index = range(1, len(df_display)+1)
 
-    # ========================== HIGHLIGHT SEVERITY ==========================
     def highlight_severity_column(val):
         color_map = {"PREMIUM":"background-color:#800000;color:white;",
                      "CRITICAL":"background-color:red;color:white;",
@@ -183,22 +184,10 @@ with tab1:
                      "MINOR":"background-color:yellow;",
                      "LOW":"background-color:lightgreen;"}
         return color_map.get(val,"")
-    
-    # ========================== DISPLAY DENGAN BUTTON =======================
-    for i, row in df_display.iterrows():
-        cols = st.columns([1,1,1,1,1,1,1,1,3,1])  # Kolom terakhir untuk button
-        cols[0].write(row["INCIDENT"])
-        cols[1].write(row["WITEL"])
-        cols[2].write(row["LAYANAN"])
-        cols[3].write(row["SERVICE ID"])
-        cols[4].write(row["JENIS_GANGGUAN"])
-        cols[5].markdown(f'<div style="{highlight_severity_column(row["SEVERITY"])}">{row["SEVERITY"]}</div>', unsafe_allow_html=True)
-        cols[6].write(row["TTR CUSTOMER"])
-        cols[7].write(row["LAST UPDATE WORKLOG"])
-        cols[8].write(row["WORKLOG SUMMARY"])
-        if cols[9].button("Tanya?", key=f"tanya_{row['INCIDENT']}"):
-            st.info(f"Tanya button ditekan untuk tiket: {row['INCIDENT']}")
-            
+
+    styled_df = df_display.style.applymap(highlight_severity_column, subset=["SEVERITY"])
+    st.dataframe(styled_df, use_container_width=True)
+
 # ============================================================
 # ======================= TIKET CLOSE ========================
 # ============================================================
