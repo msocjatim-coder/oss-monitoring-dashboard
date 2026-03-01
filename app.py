@@ -18,6 +18,9 @@ wib = ZoneInfo("Asia/Jakarta")
 if "selected_message" not in st.session_state:
     st.session_state.selected_message = None
 
+if "stored_df" not in st.session_state:
+    st.session_state.stored_df = None
+
 # ============================================================
 # ======================= CUSTOM CSS =========================
 # ============================================================
@@ -25,7 +28,7 @@ if "selected_message" not in st.session_state:
 st.markdown("""
 <style>
 
-/* === FILE UPLOADER FIX: browse sejajar drag text === */
+/* === FILE UPLOADER FIX === */
 [data-testid="stFileUploader"] section {
     display: flex;
     flex-direction: row;
@@ -39,6 +42,26 @@ st.markdown("""
     height: 38px;
     display: flex;
     align-items: center;
+}
+
+/* === Table Border Style === */
+.row-style {
+    border-bottom: 1px solid #444;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.header-style {
+    border-bottom: 2px solid white;
+    font-weight: bold;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+[data-testid="column"] {
+    border-right: 1px solid #444;
+    padding-left: 6px;
+    padding-right: 6px;
 }
 
 /* === Animasi Jam Update === */
@@ -134,11 +157,12 @@ if uploaded_files:
 
         df_list.append(df_temp)
 
-    df = pd.concat(df_list, ignore_index=True)
-    df.to_csv(DATA_FILE, index=False)
+    df_uploaded = pd.concat(df_list, ignore_index=True)
+
+    st.session_state.stored_df = df_uploaded.copy()
+    df_uploaded.to_csv(DATA_FILE, index=False)
 
     now_time = datetime.now(wib).strftime("%H:%M")
-
     with open(TIME_FILE, "w") as f:
         f.write(now_time)
 
@@ -148,11 +172,13 @@ if uploaded_files:
 # ======================= LOAD DATA ==========================
 # ============================================================
 
-if not os.path.exists(DATA_FILE):
+if st.session_state.stored_df is not None:
+    df = st.session_state.stored_df.copy()
+elif os.path.exists(DATA_FILE):
+    df = pd.read_csv(DATA_FILE)
+else:
     st.warning("Belum ada data. Silakan upload terlebih dahulu.")
     st.stop()
-
-df = pd.read_csv(DATA_FILE)
 
 # ============================================================
 # ======================= JAM UPDATE =========================
@@ -245,9 +271,11 @@ tab1, tab2, tab3 = st.tabs(
 with tab1:
 
     df_active = df[df["IS_ACTIVE"] == True].copy()
+    df_active.insert(0, "NO", range(1, len(df_active) + 1))
 
     df_display = df_active[
         [
+            "NO",
             "INCIDENT",
             "WITEL",
             "LAYANAN",
@@ -260,26 +288,21 @@ with tab1:
         ]
     ].copy()
 
-    df_display.index = range(1, len(df_display) + 1)
-
-    # HEADER TANPA KOLOM TANYA
-    header_cols = st.columns([1,1,1,1,1,1,1,1,2,1])
+    header_cols = st.columns([0.5,1,1,1,1,1,1,1,1,2,1])
     headers = list(df_display.columns)
 
     for col, header in zip(header_cols[:-1], headers):
-        col.markdown(f"**{header}**")
+        col.markdown(f"<div class='header-style'>{header}</div>", unsafe_allow_html=True)
 
     header_cols[-1].markdown("")
 
-    # ROW DATA
     for i, row in df_display.iterrows():
 
-        cols = st.columns([1,1,1,1,1,1,1,1,2,1])
+        cols = st.columns([0.5,1,1,1,1,1,1,1,1,2,1])
 
         for idx, value in enumerate(row):
-            cols[idx].write(value)
+            cols[idx].markdown(f"<div class='row-style'>{value}</div>", unsafe_allow_html=True)
 
-        # BUTTON DI SEBELAH KANAN WORKLOG SUMMARY
         with cols[-1]:
             if st.button("Tanya", key=f"tanya_{i}"):
 
