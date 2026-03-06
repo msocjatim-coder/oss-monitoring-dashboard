@@ -3,8 +3,19 @@ import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
+
+# ============================================================
+# AUTO REFRESH DASHBOARD
+# ============================================================
+
+st_autorefresh(interval=5000, limit=None, key="datarefresh")
+
+# ============================================================
+# FILE STORAGE
+# ============================================================
 
 DATA_FILE = "oss_data_shared.csv"
 TIME_FILE = "last_update_time.txt"
@@ -17,6 +28,7 @@ wib = ZoneInfo("Asia/Jakarta")
 
 st.markdown("""
 <style>
+
 [data-testid="stFileUploader"] section {
     display: flex !important;
     flex-direction: row !important;
@@ -53,6 +65,7 @@ st.markdown("""
  font-size: 16px;
  text-align: center;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,6 +79,7 @@ with col1:
     st.title("📊 OSS Monitoring Dashboard")
 
 with col2:
+
     uploaded_files = st.file_uploader(
         "",
         type=["csv"],
@@ -78,13 +92,16 @@ with col2:
 # ============================================================
 
 if uploaded_files:
+
     df_list = []
 
     for uploaded_file in uploaded_files:
+
         try:
-            df_temp = pd.read_csv(uploaded_file)
+            df_temp = pd.read_csv(uploaded_file, low_memory=False)
+
         except:
-            df_temp = pd.read_csv(uploaded_file, encoding="latin1")
+            df_temp = pd.read_csv(uploaded_file, encoding="latin1", low_memory=False)
 
         df_temp.columns = (
             df_temp.columns
@@ -95,7 +112,12 @@ if uploaded_files:
 
         df_list.append(df_temp)
 
-    df = pd.concat(df_list, ignore_index=True)
+    df = pd.concat(df_list, ignore_index=True, sort=False)
+
+    if df.empty:
+        st.error("File CSV kosong atau tidak terbaca.")
+        st.stop()
+
     df.to_csv(DATA_FILE, index=False)
 
     now_time = datetime.now(wib).strftime("%H:%M")
@@ -110,20 +132,23 @@ if uploaded_files:
 # ============================================================
 
 if not os.path.exists(DATA_FILE):
+
     st.warning("Belum ada data. Silakan upload terlebih dahulu.")
     st.stop()
 
-df = pd.read_csv(DATA_FILE)
+df = pd.read_csv(DATA_FILE, low_memory=False)
 
 # ============================================================
 # ======================= JAM UPDATE =========================
 # ============================================================
 
 if os.path.exists(TIME_FILE):
+
     with open(TIME_FILE, "r") as f:
         last_update = f.read().strip()
 
     if last_update:
+
         st.markdown(
             f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>',
             unsafe_allow_html=True
@@ -140,6 +165,7 @@ required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
 missing_cols = [col for col in required_columns if col not in df.columns]
 
 if missing_cols:
+
     st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     st.stop()
 
@@ -165,28 +191,57 @@ df["IS_ACTIVE"] = ~df["STATUS"].str.lower().isin(
 
 df["SUMMARY"] = df["SUMMARY"].astype(str)
 
+# ============================================================
+# DETECT LAYANAN
+# ============================================================
+
 df["LAYANAN"] = df["SUMMARY"].apply(
     lambda x: "TSEL" if "TSEL" in x.upper() else "OLO"
 )
 
+# ============================================================
+# DETECT JENIS GANGGUAN
+# ============================================================
+
 def detect_jenis(summary):
+
     summary = summary.upper()
-    if "RADIOIP" in summary: return "RADIOIP"
-    elif "TOPOLO" in summary: return "TOPOLO"
-    elif "METRO" in summary: return "METRO"
-    elif "CNQ" in summary: return "CNQ"
-    elif "SLD" in summary: return "SLD"
-    else: return "-"
+
+    if "RADIOIP" in summary:
+        return "RADIOIP"
+
+    elif "TOPOLO" in summary:
+        return "TOPOLO"
+
+    elif "METRO" in summary:
+        return "METRO"
+
+    elif "CNQ" in summary:
+        return "CNQ"
+
+    elif "SLD" in summary:
+        return "SLD"
+
+    else:
+        return "-"
 
 df["JENIS_GANGGUAN"] = df["SUMMARY"].apply(detect_jenis)
+
+# ============================================================
+# DETECT SEVERITY
+# ============================================================
 
 severity_list = ["PREMIUM", "CRITICAL", "MAJOR", "MINOR", "LOW"]
 
 def detect_severity(summary):
+
     summary = summary.upper()
+
     for sev in severity_list:
+
         if sev in summary:
             return sev
+
     return "-"
 
 df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
@@ -208,23 +263,40 @@ with tab1:
     df_active = df[df["IS_ACTIVE"] == True].copy()
 
     df_display = df_active[
-        ["INCIDENT","WITEL","LAYANAN","SERVICE ID","JENIS_GANGGUAN",
-         "SEVERITY","TTR CUSTOMER","LAST UPDATE WORKLOG",
-         "WORKLOG SUMMARY"]
+        [
+            "INCIDENT",
+            "WITEL",
+            "LAYANAN",
+            "SERVICE ID",
+            "JENIS_GANGGUAN",
+            "SEVERITY",
+            "TTR CUSTOMER",
+            "LAST UPDATE WORKLOG",
+            "WORKLOG SUMMARY"
+        ]
     ].copy()
 
     def format_ttr_customer(ttr):
+
         if not isinstance(ttr, str) or not ttr:
             return ttr
+
         parts = ttr.split(":")
+
         if len(parts) != 3:
             return ttr
+
         total_hours, minutes, _ = map(int, parts)
+
         days = total_hours // 24
         hours = total_hours % 24
+
         if days > 0:
+
             return f"{days} hari {hours} jam {minutes} menit"
+
         else:
+
             return f"{hours} jam {minutes} menit"
 
     df_display["TTR CUSTOMER"] = df_display["TTR CUSTOMER"].apply(format_ttr_customer)
@@ -237,6 +309,7 @@ with tab1:
     df_display.index = range(1, len(df_display)+1)
 
     def highlight_severity_column(val):
+
         color_map = {
             "PREMIUM":"background-color:#800000;color:white;",
             "CRITICAL":"background-color:red;color:white;",
@@ -244,6 +317,7 @@ with tab1:
             "MINOR":"background-color:yellow;",
             "LOW":"background-color:lightgreen;"
         }
+
         return color_map.get(val,"")
 
     styled_df = df_display.style.applymap(
@@ -259,8 +333,6 @@ with tab1:
 
 with tab2:
 
-    # ✅ PERUBAHAN DI SINI
-    # Sekarang menampilkan SEMUA data dari CSV
     df_close_display = df.copy()
 
     df_close_display.index = range(1, len(df_close_display)+1)
