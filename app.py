@@ -2,30 +2,15 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
-# ============================================================
-# AUTO REFRESH (30 MENIT)
-# ============================================================
-
-st_autorefresh = st.experimental_rerun
-
-# ============================================================
-# GOOGLE SHEET CONFIG
-# ============================================================
-
 SHEET_NAME = "OSS Incident Insera"
-
 wib = ZoneInfo("Asia/Jakarta")
 
-# ============================================================
-# GOOGLE SHEET CONNECTION (STREAMLIT CLOUD VERSION)
-# ============================================================
-
+# CONNECT GOOGLE SHEET
 def connect_google_sheet():
 
     creds_dict = st.secrets["gcp_service_account"]
@@ -46,17 +31,14 @@ def connect_google_sheet():
 
     return sheet
 
-# ============================================================
-# HEADER
-# ============================================================
 
+# HEADER
 col1, col2 = st.columns([8,2])
 
 with col1:
     st.title("📊 OSS Monitoring Dashboard")
 
 with col2:
-
     uploaded_files = st.file_uploader(
         "",
         type=["csv"],
@@ -64,10 +46,7 @@ with col2:
         label_visibility="collapsed"
     )
 
-# ============================================================
 # HANDLE UPLOAD
-# ============================================================
-
 if uploaded_files:
 
     df_list = []
@@ -89,50 +68,39 @@ if uploaded_files:
 
         df_list.append(df_temp)
 
-    df = pd.concat(df_list, ignore_index=True)
+    df_upload = pd.concat(df_list, ignore_index=True)
 
     sheet = connect_google_sheet()
 
     sheet.clear()
 
     sheet.update(
-        [df.columns.values.tolist()] +
-        df.fillna("").values.tolist()
+        [df_upload.columns.values.tolist()] +
+        df_upload.fillna("").values.tolist()
     )
 
-    st.success("Data berhasil disimpan ke Google Sheet")
+    st.success("Data berhasil diperbarui")
 
-# ============================================================
-# LOAD DATA DARI GOOGLE SHEET
-# ============================================================
-
+# LOAD DATA
 sheet = connect_google_sheet()
 
 data = sheet.get_all_records()
 
 if len(data) == 0:
 
-    st.warning("Belum ada data. Silakan upload CSV terlebih dahulu.")
+    st.warning("Belum ada data. Upload CSV terlebih dahulu.")
     st.stop()
 
 df = pd.DataFrame(data)
 
-# ============================================================
-# JAM UPDATE
-# ============================================================
+# INFO
+now = datetime.now(wib).strftime("%H:%M")
 
-now_time = datetime.now(wib).strftime("%H:%M")
-
-st.markdown(
-    f"### Data terakhir diperbarui sekitar {now_time} WIB"
-)
+st.info(f"Dashboard dibuka pada {now} WIB")
 
 st.markdown("---")
 
-# ============================================================
-# VALIDASI KOLOM
-# ============================================================
-
+# VALIDASI
 required_columns = ["INCIDENT","STATUS","WITEL","REPORTED DATE","SUMMARY"]
 
 missing_cols = [col for col in required_columns if col not in df.columns]
@@ -142,10 +110,7 @@ if missing_cols:
     st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
     st.stop()
 
-# ============================================================
 # PROCESSING
-# ============================================================
-
 df = df.drop_duplicates(subset=["INCIDENT"])
 
 df["REPORTED DATE"] = pd.to_datetime(
@@ -153,24 +118,17 @@ df["REPORTED DATE"] = pd.to_datetime(
     errors="coerce"
 )
 
-now = datetime.now(wib).replace(tzinfo=None)
+now_naive = datetime.now(wib).replace(tzinfo=None)
 
 df["UMUR_TIKET_HARI"] = (
-    now - df["REPORTED DATE"]
+    now_naive - df["REPORTED DATE"]
 ).dt.days
 
 df["IS_ACTIVE"] = ~df["STATUS"].astype(str).str.lower().isin(
     ["closed","resolved","cancel"]
 )
 
-df["LAYANAN"] = df["SUMMARY"].apply(
-    lambda x: "TSEL" if "TSEL" in str(x).upper() else "OLO"
-)
-
-# ============================================================
-# TAB DASHBOARD
-# ============================================================
-
+# TABS
 tab1, tab2, tab3 = st.tabs(
     ["TIKET AKTIF","TIKET CLOSE","DOWNLOAD"]
 )
