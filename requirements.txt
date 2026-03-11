@@ -1,6 +1,6 @@
 streamlit
 pandas
 plotly
-supabase
 python-dotenv
 numpy
+streamlit-autorefresh
