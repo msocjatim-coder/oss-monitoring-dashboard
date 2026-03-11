@@ -18,6 +18,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# =========================
+# AUTO REFRESH 30 MENIT
+# =========================
+st.markdown(
+    """
+    <meta http-equiv="refresh" content="1800">
+    """,
+    unsafe_allow_html=True
+)
+
 # Custom CSS
 st.markdown("""
 <style>
@@ -115,17 +125,14 @@ elif page == "Upload Data":
             # Confirm upload button
             if st.button("🚀 Upload to Database", type="primary", use_container_width=True):
                 with st.spinner("Processing data..."):
-                    # Process data
                     success, msg, oss_data, summary = st.session_state.csv_processor.process_upload(df)
                     
                     if success:
-                        # Insert to database
                         response = st.session_state.db_handler.insert_oss_data(df)
                         
                         if response:
                             st.success(f"✅ {msg}")
                             
-                            # Show upload summary
                             st.markdown("### 📊 Upload Summary")
                             col1, col2, col3, col4 = st.columns(4)
                             with col1:
@@ -145,7 +152,6 @@ elif page == "Upload Data":
         else:
             st.error(f"❌ {message}")
             
-            # Template download
             st.markdown("### 📥 Download Template")
             template_df = pd.DataFrame({
                 'site_id': ['SITE001', 'SITE002'],
@@ -169,11 +175,9 @@ elif page == "Upload Data":
 elif page == "Data Viewer":
     st.markdown("## 📋 Data Viewer")
     
-    # Load data
     data = st.session_state.db_handler.get_all_oss_data()
     
     if not data.empty:
-        # Data statistics
         st.markdown("### 📊 Data Statistics")
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -185,10 +189,8 @@ elif page == "Data Viewer":
         with col4:
             st.metric("Data Volume", f"{data.memory_usage(deep=True).sum() / 1024:.1f} KB")
         
-        # Data table with search
         st.markdown("### 🔍 Data Table")
         
-        # Search box
         search = st.text_input("🔎 Search...", placeholder="Cari site name atau region...")
         
         if search:
@@ -197,39 +199,12 @@ elif page == "Data Viewer":
         else:
             filtered_data = data
         
-        # Display data with styling
         st.dataframe(
             filtered_data,
             use_container_width=True,
-            hide_index=True,
-            column_config={
-                "site_id": "Site ID",
-                "site_name": "Site Name",
-                "region": "Region",
-                "status": st.column_config.TextColumn(
-                    "Status",
-                    help="Current status of the site"
-                ),
-                "uptime_percentage": st.column_config.NumberColumn(
-                    "Uptime %",
-                    format="%.2f %%"
-                ),
-                "bandwidth_usage": st.column_config.NumberColumn(
-                    "Bandwidth (Mbps)",
-                    format="%.1f Mbps"
-                ),
-                "alert_count": st.column_config.NumberColumn(
-                    "Alerts",
-                    format="%d ⚠️"
-                ),
-                "created_at": st.column_config.DatetimeColumn(
-                    "Created At",
-                    format="DD/MM/YYYY HH:mm"
-                )
-            }
+            hide_index=True
         )
         
-        # Export button
         if st.button("📥 Export to CSV", use_container_width=True):
             csv = data.to_csv(index=False)
             st.download_button(
@@ -244,17 +219,14 @@ elif page == "Data Viewer":
 elif page == "Settings":
     st.markdown("## ⚙️ Settings")
     
-    # Database settings
     st.markdown("### 🗄️ Database Settings")
     
-    # Show connection status
     try:
         test = st.session_state.db_handler.get_all_oss_data()
         st.success("✅ Database connection: OK")
     except:
         st.error("❌ Database connection: Failed")
     
-    # Data management
     st.markdown("### 🗑️ Data Management")
     
     col1, col2 = st.columns(2)
@@ -267,7 +239,6 @@ elif page == "Settings":
                 st.error("❌ Failed to clear data")
     
     with col2:
-        # Backup data
         data = st.session_state.db_handler.get_all_oss_data()
         if not data.empty:
             csv = data.to_csv(index=False)
@@ -279,7 +250,6 @@ elif page == "Settings":
                 use_container_width=True
             )
     
-    # App settings
     st.markdown("### 🎨 Appearance")
     
     theme = st.selectbox(
