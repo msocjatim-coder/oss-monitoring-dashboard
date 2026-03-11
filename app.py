@@ -1,268 +1,344 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from zoneinfo import ZoneInfo
+import os
+from streamlit_autorefresh import st_autorefresh
 
-# Import components
-from components.sidebar import ModernSidebar
-from components.dashboard import ModernDashboard
-from database.db_handler import DatabaseHandler
-from utils.csv_processor import CSVProcessor
-from models.data_model import OSSData
-import config
+# GOOGLE SHEET
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-# Page config
-st.set_page_config(
-    page_title=config.APP_TITLE,
-    page_icon=config.APP_ICON,
-    layout=config.APP_LAYOUT,
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="OSS Monitoring Dashboard", layout="wide")
 
-# =========================
-# AUTO REFRESH 30 MENIT
-# =========================
-st.markdown(
-    """
-    <meta http-equiv="refresh" content="1800">
-    """,
-    unsafe_allow_html=True
-)
+# ============================================================
+# AUTO REFRESH DASHBOARD
+# ============================================================
 
-# Custom CSS
+st_autorefresh(interval=1800000, limit=None, key="datarefresh")
+
+# ============================================================
+# FILE STORAGE
+# ============================================================
+
+DATA_FILE = "oss_data_shared.csv"
+TIME_FILE = "last_update_time.txt"
+
+# GOOGLE SHEET
+SHEET_NAME = "OSS Incident Insera"
+
+wib = ZoneInfo("Asia/Jakarta")
+
+# ============================================================
+# GOOGLE SHEET CONNECTION
+# ============================================================
+
+def connect_google_sheet():
+
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        "credentials.json",
+        scope
+    )
+
+    client = gspread.authorize(creds)
+
+    sheet = client.open(SHEET_NAME).sheet1
+
+    return sheet
+
+# ============================================================
+# ======================= CUSTOM CSS =========================
+# ============================================================
+
 st.markdown("""
 <style>
-    /* Modern styling */
-    .stApp {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    
-    /* Card styling */
-    .css-1r6slb0 {
-        border-radius: 1rem;
-        padding: 1.5rem;
-        background: rgba(255, 255, 255, 0.95);
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-        backdrop-filter: blur(4px);
-        border: 1px solid rgba(255, 255, 255, 0.18);
-    }
-    
-    /* Button styling */
-    .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 0.5rem;
-        padding: 0.5rem 1rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-    }
-    
-    /* Metric cards */
-    .metric-card {
-        background: white;
-        border-radius: 1rem;
-        padding: 1rem;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
+
+[data-testid="stFileUploader"] section {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px;
+    padding: 6px 12px 6px 12px !important;
+}
+
+[data-testid="stFileUploader"] section label p {
+    margin: 0;
+    flex: 1;
+}
+
+[data-testid="stFileUploader"] div[role="button"] {
+    min-height: 38px;
+    border-radius: 8px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes blink {
+0% { opacity: 1; }
+50% { opacity: 0.2; }
+100% { opacity: 1; }
+}
+
+.blink-text {
+ animation: blink 1.2s infinite;
+ font-weight: bold;
+ color: white;
+ font-size: 16px;
+ text-align: center;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
-if 'db_handler' not in st.session_state:
-    st.session_state.db_handler = DatabaseHandler()
-if 'csv_processor' not in st.session_state:
-    st.session_state.csv_processor = CSVProcessor()
+# ============================================================
+# ======================= HEADER =============================
+# ============================================================
 
-# Render sidebar and get navigation
-nav = ModernSidebar.render()
-page = nav['page']
-filters = nav['filters']
+col1, col2 = st.columns([8, 2])
 
-# Main content area
-if page == "Dashboard":
-    # Load data from database
-    with st.spinner("Loading data..."):
-        data = st.session_state.db_handler.get_all_oss_data()
-    
-    # Render dashboard
-    ModernDashboard.render(data, filters)
+with col1:
+    st.title("📊 OSS Monitoring Dashboard")
 
-elif page == "Upload Data":
-    st.markdown("## 📤 Upload Data OSS")
-    
-    # File uploader dengan desain modern
-    uploaded_file = st.file_uploader(
-        "Upload CSV File",
-        type=['csv'],
-        help="Upload file CSV dengan format yang sesuai"
+with col2:
+
+    uploaded_files = st.file_uploader(
+        "",
+        type=["csv"],
+        accept_multiple_files=True,
+        label_visibility="collapsed"
     )
-    
-    if uploaded_file is not None:
-        # Validasi CSV
-        is_valid, message, df = st.session_state.csv_processor.validate_csv(uploaded_file)
-        
-        if is_valid:
-            st.success(f"✅ {message}")
-            
-            # Preview data
-            st.markdown("### 👁️ Preview Data")
-            st.dataframe(df.head(), use_container_width=True)
-            
-            # Show data statistics
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.info(f"📊 Total Rows: {len(df)}")
-            with col2:
-                st.info(f"📋 Total Columns: {len(df.columns)}")
-            with col3:
-                st.info(f"🏷️ Regions: {df['region'].nunique() if 'region' in df.columns else 'N/A'}")
-            
-            # Confirm upload button
-            if st.button("🚀 Upload to Database", type="primary", use_container_width=True):
-                with st.spinner("Processing data..."):
-                    success, msg, oss_data, summary = st.session_state.csv_processor.process_upload(df)
-                    
-                    if success:
-                        response = st.session_state.db_handler.insert_oss_data(df)
-                        
-                        if response:
-                            st.success(f"✅ {msg}")
-                            
-                            st.markdown("### 📊 Upload Summary")
-                            col1, col2, col3, col4 = st.columns(4)
-                            with col1:
-                                st.metric("Total Sites", summary['total_sites'])
-                            with col2:
-                                st.metric("Active Sites", summary['active_sites'])
-                            with col3:
-                                st.metric("Avg Uptime", f"{summary['avg_uptime']:.1f}%")
-                            with col4:
-                                st.metric("Total Alerts", summary['total_alerts'])
-                            
-                            st.balloons()
-                        else:
-                            st.error("❌ Gagal menyimpan ke database")
-                    else:
-                        st.error(f"❌ {msg}")
-        else:
-            st.error(f"❌ {message}")
-            
-            st.markdown("### 📥 Download Template")
-            template_df = pd.DataFrame({
-                'site_id': ['SITE001', 'SITE002'],
-                'site_name': ['Site Jakarta 1', 'Site Bandung 1'],
-                'region': ['Jakarta', 'Bandung'],
-                'status': ['Active', 'Maintenance'],
-                'uptime_percentage': [99.5, 98.2],
-                'bandwidth_usage': [150.5, 200.3],
-                'last_maintenance': ['2024-01-15', '2024-01-20'],
-                'alert_count': [0, 2]
-            })
-            
-            csv = template_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download CSV Template",
-                data=csv,
-                file_name="oss_template.csv",
-                mime="text/csv"
+
+# ============================================================
+# ======================= HANDLE UPLOAD ======================
+# ============================================================
+
+if uploaded_files:
+
+    df_list = []
+
+    for uploaded_file in uploaded_files:
+
+        try:
+
+            df_temp = pd.read_csv(
+                uploaded_file,
+                low_memory=False,
+                encoding="utf-8",
+                on_bad_lines="skip"
             )
 
-elif page == "Data Viewer":
-    st.markdown("## 📋 Data Viewer")
-    
-    data = st.session_state.db_handler.get_all_oss_data()
-    
-    if not data.empty:
-        st.markdown("### 📊 Data Statistics")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Total Records", len(data))
-        with col2:
-            st.metric("Total Sites", data['site_id'].nunique() if 'site_id' in data.columns else 'N/A')
-        with col3:
-            st.metric("Last Update", data['created_at'].max()[:10] if 'created_at' in data.columns else 'N/A')
-        with col4:
-            st.metric("Data Volume", f"{data.memory_usage(deep=True).sum() / 1024:.1f} KB")
-        
-        st.markdown("### 🔍 Data Table")
-        
-        search = st.text_input("🔎 Search...", placeholder="Cari site name atau region...")
-        
-        if search:
-            mask = data['site_name'].str.contains(search, case=False) | data['region'].str.contains(search, case=False)
-            filtered_data = data[mask]
-        else:
-            filtered_data = data
-        
-        st.dataframe(
-            filtered_data,
-            use_container_width=True,
-            hide_index=True
+        except:
+
+            df_temp = pd.read_csv(
+                uploaded_file,
+                encoding="latin1",
+                low_memory=False,
+                on_bad_lines="skip"
+            )
+
+        df_temp.columns = (
+            df_temp.columns
+            .str.strip()
+            .str.replace('"', '', regex=False)
+            .str.replace(',', '', regex=False)
         )
-        
-        if st.button("📥 Export to CSV", use_container_width=True):
-            csv = data.to_csv(index=False)
-            st.download_button(
-                label="📥 Download CSV",
-                data=csv,
-                file_name=f"oss_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
-    else:
-        st.info("📭 No data available. Please upload data first.")
 
-elif page == "Settings":
-    st.markdown("## ⚙️ Settings")
-    
-    st.markdown("### 🗄️ Database Settings")
-    
+        df_list.append(df_temp)
+
+    df = pd.concat(df_list, ignore_index=True, sort=False)
+
+    if df.empty:
+        st.error("File CSV kosong atau tidak terbaca.")
+        st.stop()
+
+    df.to_csv(DATA_FILE, index=False)
+
+    now_time = datetime.now(wib).strftime("%H:%M")
+
+    with open(TIME_FILE, "w") as f:
+        f.write(now_time)
+
     try:
-        test = st.session_state.db_handler.get_all_oss_data()
-        st.success("✅ Database connection: OK")
-    except:
-        st.error("❌ Database connection: Failed")
-    
-    st.markdown("### 🗑️ Data Management")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🧹 Clear All Data", type="secondary", use_container_width=True):
-            if st.session_state.db_handler.delete_all_data():
-                st.success("✅ All data cleared")
-                st.rerun()
-            else:
-                st.error("❌ Failed to clear data")
-    
-    with col2:
-        data = st.session_state.db_handler.get_all_oss_data()
-        if not data.empty:
-            csv = data.to_csv(index=False)
-            st.download_button(
-                label="💾 Backup Data",
-                data=csv,
-                file_name=f"oss_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-    
-    st.markdown("### 🎨 Appearance")
-    
-    theme = st.selectbox(
-        "Theme",
-        ["Light", "Dark", "System"],
-        index=0
+
+        sheet = connect_google_sheet()
+
+        sheet.clear()
+
+        sheet.update(
+            [df.columns.values.tolist()] +
+            df.fillna("").values.tolist()
+        )
+
+        st.success("Data berhasil diperbarui & tersimpan ke Google Sheet.")
+
+    except Exception as e:
+
+        st.warning("Data tersimpan lokal tetapi gagal update Google Sheet.")
+        st.write(e)
+
+# ============================================================
+# ======================= LOAD DATA ==========================
+# ============================================================
+
+if not os.path.exists(DATA_FILE):
+
+    st.warning("Belum ada data. Silakan upload terlebih dahulu.")
+    st.stop()
+
+df = pd.read_csv(DATA_FILE, low_memory=False)
+
+# ============================================================
+# ======================= JAM UPDATE =========================
+# ============================================================
+
+if os.path.exists(TIME_FILE):
+
+    with open(TIME_FILE, "r") as f:
+        last_update = f.read().strip()
+
+    if last_update:
+
+        st.markdown(
+            f'<div class="blink-text">Data Diperbarui pada {last_update} WIB</div>',
+            unsafe_allow_html=True
+        )
+
+st.markdown("---")
+
+# ============================================================
+# ======================= VALIDASI ===========================
+# ============================================================
+
+required_columns = ["INCIDENT", "STATUS", "WITEL", "REPORTED DATE", "SUMMARY"]
+
+missing_cols = [col for col in required_columns if col not in df.columns]
+
+if missing_cols:
+
+    st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
+    st.stop()
+
+# ============================================================
+# ======================= PROCESSING =========================
+# ============================================================
+
+df = df.drop_duplicates(subset=["INCIDENT"])
+
+df["REPORTED DATE"] = pd.to_datetime(
+    df["REPORTED DATE"],
+    errors="coerce"
+).dt.tz_localize(None)
+
+now_naive = datetime.now(wib).replace(tzinfo=None)
+
+df["UMUR_TIKET_HARI"] = (
+    now_naive - df["REPORTED DATE"]
+).dt.days
+
+df["IS_ACTIVE"] = ~df["STATUS"].astype(str).str.lower().isin(
+    ["closed", "resolved", "cancel"]
+)
+
+df["SUMMARY"] = df["SUMMARY"].astype(str)
+
+df["LAYANAN"] = df["SUMMARY"].apply(
+    lambda x: "TSEL" if "TSEL" in x.upper() else "OLO"
+)
+
+# ============================================================
+# DETECT JENIS GANGGUAN
+# ============================================================
+
+def detect_jenis(summary):
+
+    summary = summary.upper()
+
+    if "RADIOIP" in summary:
+        return "RADIOIP"
+
+    elif "TOPOLO" in summary:
+        return "TOPOLO"
+
+    elif "METRO" in summary:
+        return "METRO"
+
+    elif "CNQ" in summary:
+        return "CNQ"
+
+    elif "SLD" in summary:
+        return "SLD"
+
+    else:
+        return "-"
+
+df["JENIS_GANGGUAN"] = df["SUMMARY"].apply(detect_jenis)
+
+severity_list = ["PREMIUM", "CRITICAL", "MAJOR", "MINOR", "LOW"]
+
+def detect_severity(summary):
+
+    summary = summary.upper()
+
+    for sev in severity_list:
+
+        if sev in summary:
+            return sev
+
+    return "-"
+
+df["SEVERITY"] = df["SUMMARY"].apply(detect_severity)
+
+tab1, tab2, tab3 = st.tabs(
+    ["TIKET AKTIF", "TIKET CLOSE", "DOWNLOAD TIKET"]
+)
+
+with tab1:
+
+    df_active = df[df["IS_ACTIVE"] == True].copy()
+
+    display_columns = [
+        "INCIDENT",
+        "WITEL",
+        "LAYANAN",
+        "SERVICE ID",
+        "JENIS_GANGGUAN",
+        "SEVERITY",
+        "TTR CUSTOMER",
+        "LAST UPDATE WORKLOG",
+        "WORKLOG SUMMARY"
+    ]
+
+    display_columns = [c for c in display_columns if c in df_active.columns]
+
+    df_display = df_active[display_columns].copy()
+
+    df_display.index = range(1, len(df_display)+1)
+
+    st.dataframe(df_display, use_container_width=True)
+
+with tab2:
+
+    df_close_display = df.copy()
+
+    df_close_display.index = range(1, len(df_close_display)+1)
+
+    st.dataframe(df_close_display, use_container_width=True)
+
+with tab3:
+
+    csv_download = df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        label="Download Semua Data (CSV)",
+        data=csv_download,
+        file_name="oss_full_data.csv",
+        mime="text/csv"
     )
-    
-    chart_style = st.selectbox(
-        "Chart Style",
-        ["Modern", "Classic", "Minimal"],
-        index=0
-    )
-    
-    if st.button("💾 Save Settings", type="primary"):
-        st.success("✅ Settings saved!")
